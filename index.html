@@ -714,6 +714,10 @@
                   <input type="radio" name="noteMode" id="modeChromatic" value="chromatic">
                   <label for="modeChromatic"><span><span class="mode-name">ノンダイアトニック</span><span class="mode-description">半音を含むオクターブ内の12音から出題</span></span><span class="mode-count">12 NOTES</span></label>
                 </div>
+                <div class="option mode-option">
+                  <input type="checkbox" name="excludeTonic" id="excludeTonic">
+                  <label for="excludeTonic"><span><span class="mode-name">主音を除外</span><span class="mode-description">ドを出題しない</span></span><span class="mode-count">− I</span></label>
+                </div>
               </div>
             </fieldset>
 
@@ -925,7 +929,7 @@
       let previousKeyIndex = null;
       let lastRoundCorrect = null;
       const activeOscillators = new Set();
-      let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'piano' };
+      let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'piano', excludeTonic: false };
       let keyButtons = [];
       let userAnswers = [];
       let statsReturnView = 'settings';
@@ -1205,9 +1209,13 @@
         }
         previousKeyIndex = keyIndex;
         const key = KEYS[keyIndex];
+        const eligibleDegrees = session.mode.intervals
+          .map((interval, index) => ({ interval, index }))
+          .filter(choice => !session.excludeTonic || choice.interval !== 0)
+          .map(choice => choice.index);
         const degrees = Array.from(
           { length: session.sequenceLength },
-          () => randomIndex(session.mode.intervals.length)
+          () => eligibleDegrees[randomIndex(eligibleDegrees.length)]
         );
         const intervals = degrees.map(degree => session.mode.intervals[degree]);
         const windowStart = 36 + randomIndex(48);
@@ -1429,7 +1437,8 @@
         statsPanel.hidden = true;
         const percentage = Math.round((score / session.total) * 100);
         resultScore.textContent = percentage;
-        resultCaption.textContent = `${session.mode.label} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
+        const tonicSetting = session.excludeTonic ? ' · 主音除外' : '';
+        resultCaption.textContent = `${session.mode.label}${tonicSetting} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
         setupNumber.textContent = 'RESULT';
         setupTitle.textContent = '結果';
         setupNote.textContent = '';
@@ -1480,7 +1489,8 @@
           modeId,
           mode: MODES[modeId],
           sequenceLength: Number(data.get('sequenceLength')),
-          timbre: data.get('timbre')
+          timbre: data.get('timbre'),
+          excludeTonic: data.has('excludeTonic')
         };
         ensureAudio();
         if (session.timbre === 'piano') {
