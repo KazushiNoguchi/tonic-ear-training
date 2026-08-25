@@ -1423,17 +1423,24 @@
 
       function scheduleTonicResolution(interval, targetMidi, start) {
         let scaleSteps;
-        let tonicMidi;
+        const tonicMidi = targetMidi - interval;
+        const isDiatonic = MAJOR_STEPS.includes(interval);
         if (interval <= 5) {
-          tonicMidi = targetMidi - interval;
-          scaleSteps = session.mode.intervals
-            .filter(step => step <= interval)
+          const adjacentDiatonic = isDiatonic
+            ? interval
+            : Math.max(...MAJOR_STEPS.filter(step => step < interval));
+          scaleSteps = MAJOR_STEPS
+            .filter(step => step <= adjacentDiatonic)
             .sort((a, b) => b - a);
+          if (!isDiatonic) scaleSteps.unshift(interval);
         } else {
-          tonicMidi = targetMidi - interval;
-          scaleSteps = session.mode.intervals
-            .filter(step => step >= interval)
+          const adjacentDiatonic = isDiatonic
+            ? interval
+            : Math.min(...MAJOR_STEPS.filter(step => step > interval));
+          scaleSteps = MAJOR_STEPS
+            .filter(step => step >= adjacentDiatonic)
             .sort((a, b) => a - b);
+          if (!isDiatonic) scaleSteps.unshift(interval);
           scaleSteps.push(12);
         }
 
