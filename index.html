@@ -181,6 +181,48 @@
       border: 0;
     }
 
+    .advanced-options {
+      margin: 0 0 30px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .advanced-options summary {
+      padding: 15px 16px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+
+    .advanced-content { padding: 3px 16px 18px; }
+    .advanced-content .setting-group:last-child { margin-bottom: 0; }
+
+    .exclude-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+    }
+
+    .exclude-option { position: relative; }
+    .exclude-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .exclude-option label {
+      display: grid;
+      min-height: 42px;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .exclude-option input:checked + label { border-color: var(--red); background: rgba(219, 61, 50, 0.12); color: var(--red); text-decoration: line-through; }
+    .exclude-option input:disabled + label { cursor: not-allowed; opacity: 0.28; }
+    .exclude-option input:focus-visible + label { outline: 3px solid var(--mint); outline-offset: 2px; }
+
+    .range-controls { display: grid; gap: 15px; }
+    .range-row { display: grid; grid-template-columns: 42px minmax(100px, 1fr) 35px; align-items: center; gap: 10px; font-size: 12px; }
+    .range-row input { width: 100%; accent-color: var(--orange); cursor: pointer; }
+    .range-row output { text-align: right; font: 500 11px/1 "DM Mono", monospace; }
+
     .setting-group legend {
       width: 100%;
       margin-bottom: 13px;
@@ -623,6 +665,7 @@
       .setup-note { margin-top: 16px; line-height: 1.7; }
       .setup-form-wrap { padding: 28px 20px 32px; }
       .setting-group { margin-bottom: 25px; }
+      .exclude-grid { grid-template-columns: repeat(4, 1fr); }
       .count-option label { min-height: 54px; }
       .mode-option label { min-height: 65px; padding: 11px 13px; }
       .setup-actions { grid-template-columns: 1fr; }
@@ -714,10 +757,6 @@
                   <input type="radio" name="noteMode" id="modeChromatic" value="chromatic">
                   <label for="modeChromatic"><span><span class="mode-name">ノンダイアトニック</span><span class="mode-description">半音を含むオクターブ内の12音から出題</span></span><span class="mode-count">12 NOTES</span></label>
                 </div>
-                <div class="option mode-option">
-                  <input type="checkbox" name="excludeTonic" id="excludeTonic">
-                  <label for="excludeTonic"><span><span class="mode-name">主音を除外</span><span class="mode-description">ドを出題しない</span></span><span class="mode-count">− I</span></label>
-                </div>
               </div>
             </fieldset>
 
@@ -739,6 +778,37 @@
                 <div class="option count-option"><input type="radio" name="timbre" id="timbreSawtooth" value="sawtooth"><label for="timbreSawtooth">鋸状波</label></div>
               </div>
             </fieldset>
+
+            <details class="advanced-options">
+              <summary>詳細オプション</summary>
+              <div class="advanced-content">
+                <fieldset class="setting-group">
+                  <legend>除外する音</legend>
+                  <div class="exclude-grid">
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude0" value="0"><label for="exclude0">ド</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude1" value="1"><label for="exclude1">ド♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude2" value="2"><label for="exclude2">レ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude3" value="3"><label for="exclude3">レ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude4" value="4"><label for="exclude4">ミ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude5" value="5"><label for="exclude5">ファ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude6" value="6"><label for="exclude6">ファ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude7" value="7"><label for="exclude7">ソ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude8" value="8"><label for="exclude8">ソ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude9" value="9"><label for="exclude9">ラ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude10" value="10"><label for="exclude10">ラ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude11" value="11"><label for="exclude11">シ</label></div>
+                  </div>
+                </fieldset>
+
+                <fieldset class="setting-group">
+                  <legend>出題音域</legend>
+                  <div class="range-controls">
+                    <label class="range-row" for="rangeMin"><span>最低音</span><input type="range" name="rangeMin" id="rangeMin" min="36" max="83" value="36"><output id="rangeMinValue" for="rangeMin">C2</output></label>
+                    <label class="range-row" for="rangeMax"><span>最高音</span><input type="range" name="rangeMax" id="rangeMax" min="48" max="95" value="95"><output id="rangeMaxValue" for="rangeMax">B6</output></label>
+                  </div>
+                </fieldset>
+              </div>
+            </details>
 
             <div class="setup-actions">
               <button class="primary setup-submit" type="submit">この設定で始める →</button>
@@ -881,6 +951,12 @@
       const keyboardHint = document.querySelector('.keyboard-hint');
       const settingsForm = document.querySelector('#settingsForm');
       const setupSubmitButton = settingsForm.querySelector('.setup-submit');
+      const noteModeInputs = [...settingsForm.querySelectorAll('input[name="noteMode"]')];
+      const excludeNoteInputs = [...settingsForm.querySelectorAll('input[name="excludeNote"]')];
+      const rangeMinInput = document.querySelector('#rangeMin');
+      const rangeMaxInput = document.querySelector('#rangeMax');
+      const rangeMinValue = document.querySelector('#rangeMinValue');
+      const rangeMaxValue = document.querySelector('#rangeMaxValue');
       const resultPanel = document.querySelector('#resultPanel');
       const statsPanel = document.querySelector('#statsPanel');
       const statsList = document.querySelector('#statsList');
@@ -929,7 +1005,16 @@
       let previousKeyIndex = null;
       let lastRoundCorrect = null;
       const activeOscillators = new Set();
-      let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'piano', excludeTonic: false };
+      let session = {
+        total: 10,
+        modeId: 'diatonic',
+        mode: MODES.diatonic,
+        sequenceLength: 1,
+        timbre: 'piano',
+        excludedIntervals: [],
+        rangeMin: 36,
+        rangeMax: 95
+      };
       let keyButtons = [];
       let userAnswers = [];
       let statsReturnView = 'settings';
@@ -1067,7 +1152,7 @@
         if (!samples) return Promise.resolve();
 
         pianoLoadPromise = Promise.all(
-          Array.from({ length: 60 }, (_, index) => index + 36).map(async midi => {
+          Array.from({ length: 73 }, (_, index) => index + 30).map(async midi => {
             const dataUri = samples[midiToSampleName(midi)];
             if (!dataUri) return;
             const buffer = await audioContext.decodeAudioData(dataUriToArrayBuffer(dataUri));
@@ -1209,16 +1294,18 @@
         }
         previousKeyIndex = keyIndex;
         const key = KEYS[keyIndex];
+        const excludedIntervals = new Set(session.excludedIntervals);
         const eligibleDegrees = session.mode.intervals
           .map((interval, index) => ({ interval, index }))
-          .filter(choice => !session.excludeTonic || choice.interval !== 0)
+          .filter(choice => !excludedIntervals.has(choice.interval))
           .map(choice => choice.index);
         const degrees = Array.from(
           { length: session.sequenceLength },
           () => eligibleDegrees[randomIndex(eligibleDegrees.length)]
         );
         const intervals = degrees.map(degree => session.mode.intervals[degree]);
-        const windowStart = 36 + randomIndex(48);
+        const windowCount = session.rangeMax - session.rangeMin - 10;
+        const windowStart = session.rangeMin + randomIndex(windowCount);
         const targetMidis = intervals.map(interval => {
           const pitchClass = (key.midi + interval) % 12;
           return windowStart + ((pitchClass - (windowStart % 12) + 12) % 12);
@@ -1227,7 +1314,8 @@
           key,
           degrees,
           intervals,
-          targetMidis
+          targetMidis,
+          windowStart
         };
       }
 
@@ -1328,6 +1416,34 @@
         midis.forEach((midi, index) => scheduleTone(midi, start + index * 0.5, 0.46, 0.25));
       }
 
+      function midiInRoundWindow(interval) {
+        const pitchClass = (currentRound.key.midi + interval) % 12;
+        return currentRound.windowStart + ((pitchClass - (currentRound.windowStart % 12) + 12) % 12);
+      }
+
+      function scheduleTonicResolution(interval, targetMidi, start) {
+        let scaleSteps;
+        let tonicMidi;
+        if (interval <= 5) {
+          tonicMidi = targetMidi - interval;
+          scaleSteps = session.mode.intervals
+            .filter(step => step <= interval)
+            .sort((a, b) => b - a);
+        } else {
+          tonicMidi = targetMidi - interval;
+          scaleSteps = session.mode.intervals
+            .filter(step => step >= interval)
+            .sort((a, b) => a - b);
+          scaleSteps.push(12);
+        }
+
+        if (interval === 0) scaleSteps = [0];
+        scaleSteps.forEach((step, index) => {
+          const isFinalTonic = index === scaleSteps.length - 1;
+          scheduleTone(tonicMidi + step, start + index * 0.25, isFinalTonic ? 0.5 : 0.23, 0.25);
+        });
+      }
+
       function evaluateAnswers() {
         state = 'feedback';
         clearPlayback();
@@ -1343,7 +1459,7 @@
 
         const answerNames = userAnswers.map(index => session.mode.names[index]);
         const correctNames = currentRound.degrees.map(index => session.mode.names[index]);
-        const selectedMidis = userAnswers.map(index => currentRound.key.midi + 12 + session.mode.intervals[index]);
+        const selectedMidis = userAnswers.map(index => midiInRoundWindow(session.mode.intervals[index]));
         const correctDegreeSet = new Set(currentRound.degrees);
 
         userAnswers.forEach((answerIndex, index) => {
@@ -1353,10 +1469,16 @@
 
         ensureAudio();
         const now = audioContext.currentTime + 0.03;
+        const isSingleNote = session.sequenceLength === 1;
         if (correct) {
           score += 1;
           streak += 1;
-          scheduleSequence(selectedMidis, now);
+          if (isSingleNote) {
+            scheduleTone(currentRound.targetMidis[0], now, 0.5, 0.25);
+            scheduleTonicResolution(currentRound.intervals[0], currentRound.targetMidis[0], now + 0.65);
+          } else {
+            scheduleSequence(selectedMidis, now);
+          }
           feedbackMain.textContent = '正解';
           feedbackDetail.textContent = `${correctNames.join(' → ')} ／ ${currentRound.key.name}`;
           headline.textContent = '正解';
@@ -1364,8 +1486,14 @@
           liveRegion.textContent = `正解。${correctNames.join('、')}です。`;
         } else {
           streak = 0;
-          scheduleSequence(selectedMidis, now);
-          scheduleSequence(currentRound.targetMidis, now + selectedMidis.length * 0.5 + 0.35);
+          if (isSingleNote) {
+            scheduleTone(selectedMidis[0], now, 0.5, 0.25);
+            scheduleTone(currentRound.targetMidis[0], now + 0.65, 0.5, 0.25);
+            scheduleTonicResolution(currentRound.intervals[0], currentRound.targetMidis[0], now + 1.3);
+          } else {
+            scheduleSequence(selectedMidis, now);
+            scheduleSequence(currentRound.targetMidis, now + selectedMidis.length * 0.5 + 0.35);
+          }
           feedbackMain.textContent = '不正解';
           feedbackDetail.textContent = `回答：${answerNames.join(' → ')} ／ 正解：${correctNames.join(' → ')} ／ ${currentRound.key.name}`;
           headline.textContent = '不正解';
@@ -1392,6 +1520,8 @@
         animateKey(index);
         userAnswers.push(index);
         if (userAnswers.length < session.sequenceLength) {
+          ensureAudio();
+          scheduleTone(midiInRoundWindow(session.mode.intervals[index]), audioContext.currentTime + 0.01, 0.28, 0.22);
           headline.textContent = `${userAnswers.length} / ${session.sequenceLength}`;
           statusCopy.textContent = userAnswers.map(answerIndex => session.mode.names[answerIndex]).join(' → ');
           clearAnswerButton.disabled = false;
@@ -1437,8 +1567,8 @@
         statsPanel.hidden = true;
         const percentage = Math.round((score / session.total) * 100);
         resultScore.textContent = percentage;
-        const tonicSetting = session.excludeTonic ? ' · 主音除外' : '';
-        resultCaption.textContent = `${session.mode.label}${tonicSetting} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
+        const exclusionSetting = session.excludedIntervals.length ? ` · ${session.excludedIntervals.length}音除外` : '';
+        resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
         setupNumber.textContent = 'RESULT';
         setupTitle.textContent = '結果';
         setupNote.textContent = '';
@@ -1480,17 +1610,55 @@
         }
       }
 
+      function updateExcludeOptions() {
+        const modeId = noteModeInputs.find(input => input.checked)?.value || 'diatonic';
+        const availableIntervals = new Set(MODES[modeId].intervals);
+        excludeNoteInputs.forEach(input => {
+          input.disabled = !availableIntervals.has(Number(input.value));
+        });
+      }
+
+      function updateRange(source) {
+        let minimum = Number(rangeMinInput.value);
+        let maximum = Number(rangeMaxInput.value);
+        if (maximum - minimum < 12) {
+          if (source === 'minimum') {
+            maximum = minimum + 12;
+            rangeMaxInput.value = String(maximum);
+          } else {
+            minimum = maximum - 12;
+            rangeMinInput.value = String(minimum);
+          }
+        }
+        rangeMinValue.textContent = midiToSampleName(minimum);
+        rangeMaxValue.textContent = midiToSampleName(maximum);
+      }
+
+      noteModeInputs.forEach(input => input.addEventListener('change', updateExcludeOptions));
+      rangeMinInput.addEventListener('input', () => updateRange('minimum'));
+      rangeMaxInput.addEventListener('input', () => updateRange('maximum'));
+      updateExcludeOptions();
+      updateRange('minimum');
+
       settingsForm.addEventListener('submit', async event => {
         event.preventDefault();
         const data = new FormData(settingsForm);
         const modeId = data.get('noteMode');
+        const excludedIntervals = data.getAll('excludeNote').map(Number);
+        const availableIntervals = MODES[modeId].intervals.filter(interval => !excludedIntervals.includes(interval));
+        if (!availableIntervals.length) {
+          window.alert('出題する音を1つ以上残してください。');
+          return;
+        }
         session = {
           total: Number(data.get('questionCount')),
           modeId,
           mode: MODES[modeId],
           sequenceLength: Number(data.get('sequenceLength')),
           timbre: data.get('timbre'),
-          excludeTonic: data.has('excludeTonic')
+          excludedIntervals,
+          rangeMin: Number(data.get('rangeMin')),
+          rangeMax: Number(data.get('rangeMax'))
         };
         ensureAudio();
         if (session.timbre === 'piano') {
