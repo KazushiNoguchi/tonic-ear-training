@@ -923,6 +923,7 @@
       let playbackId = 0;
       let timers = [];
       let previousKeyIndex = null;
+      let lastRoundCorrect = null;
       const activeOscillators = new Set();
       let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'piano' };
       let keyButtons = [];
@@ -1227,12 +1228,14 @@
         return [rootMidi - 12, ...intervals.map(interval => rootMidi + interval)];
       }
 
-      function playRound() {
-        if (!currentRound || state === 'feedback') return;
+      function playRound(reviewMode = false) {
+        if (!currentRound || (state === 'feedback' && !reviewMode)) return;
         ensureAudio();
         clearPlayback();
-        userAnswers = [];
-        resetKeyStyles();
+        if (!reviewMode) {
+          userAnswers = [];
+          resetKeyStyles();
+        }
         setKeysEnabled(false);
         feedback.classList.remove('visible');
         nextButton.disabled = true;
@@ -1274,6 +1277,19 @@
         const answerReadyDelay = 2.5 + session.sequenceLength * 0.5 + 0.25;
         scheduleUi(answerReadyDelay, () => {
           if (idAtStart !== playbackId) return;
+          if (reviewMode) {
+            state = 'feedback';
+            game.classList.remove('is-playing');
+            phaseText.textContent = lastRoundCorrect ? '正解' : '不正解';
+            headline.textContent = lastRoundCorrect ? '正解' : '不正解';
+            setSequence(-1, 2);
+            feedback.classList.add('visible');
+            replayButton.disabled = false;
+            nextButton.disabled = false;
+            nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
+            liveRegion.textContent = '再生が終わりました。';
+            return;
+          }
           state = 'answering';
           game.classList.remove('is-playing');
           phaseText.textContent = '回答';
@@ -1314,6 +1330,7 @@
 
         const positionResults = userAnswers.map((answerIndex, index) => answerIndex === currentRound.degrees[index]);
         const correct = positionResults.every(Boolean);
+        lastRoundCorrect = correct;
         currentRound.intervals.forEach((interval, index) => recordAnswer(interval, positionResults[index]));
 
         const answerNames = userAnswers.map(index => session.mode.names[index]);
@@ -1357,6 +1374,8 @@
         setSequence(-1, 2);
         nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
         nextButton.disabled = false;
+        replayButton.disabled = false;
+        clearAnswerButton.hidden = true;
         nextButton.focus();
       }
 
@@ -1377,6 +1396,7 @@
       function resetSession() {
         clearPlayback();
         currentRound = null;
+        lastRoundCorrect = null;
         roundNumber = 0;
         score = 0;
         attempts = 0;
@@ -1474,8 +1494,8 @@
       });
 
       replayButton.addEventListener('click', () => {
-        if (state !== 'answering') return;
-        playRound();
+        if (state === 'answering') playRound();
+        else if (state === 'feedback') playRound(true);
       });
 
       clearAnswerButton.addEventListener('click', () => {
