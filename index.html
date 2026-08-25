@@ -671,8 +671,8 @@
         <div class="header-help">イヤホン推奨 ・ 音量にご注意ください</div>
         <label class="volume-control" for="volumeSlider">
           <span>VOL</span>
-          <input id="volumeSlider" type="range" min="0" max="100" value="68" aria-label="音量">
-          <output id="volumeValue" for="volumeSlider">68</output>
+          <input id="volumeSlider" type="range" min="0" max="100" value="30" aria-label="音量">
+          <output id="volumeValue" for="volumeSlider">30</output>
         </label>
       </div>
     </header>
@@ -729,10 +729,10 @@
             <fieldset class="setting-group">
               <legend><span class="setting-index">04</span>音色</legend>
               <div class="count-options timbre-options">
-                <div class="option count-option"><input type="radio" name="timbre" id="timbreSquare" value="square"><label for="timbreSquare">矩形波</label></div>
-                <div class="option count-option"><input type="radio" name="timbre" id="timbrePiano" value="piano"><label for="timbrePiano">ピアノ</label></div>
+                <div class="option count-option"><input type="radio" name="timbre" id="timbrePiano" value="piano" checked><label for="timbrePiano">ピアノ</label></div>
                 <div class="option count-option"><input type="radio" name="timbre" id="timbreSine" value="sine"><label for="timbreSine">サイン波</label></div>
-                <div class="option count-option"><input type="radio" name="timbre" id="timbreSawtooth" value="sawtooth" checked><label for="timbreSawtooth">鋸状波</label></div>
+                <div class="option count-option"><input type="radio" name="timbre" id="timbreSquare" value="square"><label for="timbreSquare">矩形波</label></div>
+                <div class="option count-option"><input type="radio" name="timbre" id="timbreSawtooth" value="sawtooth"><label for="timbreSawtooth">鋸状波</label></div>
               </div>
             </fieldset>
 
@@ -924,7 +924,7 @@
       let timers = [];
       let previousKeyIndex = null;
       const activeOscillators = new Set();
-      let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'sawtooth' };
+      let session = { total: 10, modeId: 'diatonic', mode: MODES.diatonic, sequenceLength: 1, timbre: 'piano' };
       let keyButtons = [];
       let userAnswers = [];
       let statsReturnView = 'settings';
@@ -932,7 +932,7 @@
       let pianoLoadPromise = null;
 
       const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
-      let masterVolume = 0.68;
+      let masterVolume = 0.3;
       try {
         const savedVolume = Number(localStorage.getItem(VOLUME_STORAGE_KEY));
         if (Number.isFinite(savedVolume) && savedVolume >= 0 && savedVolume <= 1) masterVolume = savedVolume;
