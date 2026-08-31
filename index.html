@@ -1003,6 +1003,9 @@
       let playbackId = 0;
       let timers = [];
       let previousKeyIndex = null;
+      let keyBag = [];
+      let degreeBag = [];
+      let degreeBagSignature = '';
       let lastRoundCorrect = null;
       const activeOscillators = new Set();
       let session = {
@@ -1287,12 +1290,40 @@
         return Math.floor(Math.random() * length);
       }
 
-      function buildRound() {
-        let keyIndex = randomIndex(KEYS.length);
-        if (keyIndex === previousKeyIndex) {
-          keyIndex = (keyIndex + 1 + randomIndex(KEYS.length - 1)) % KEYS.length;
+      function shuffled(values) {
+        const result = [...values];
+        for (let index = result.length - 1; index > 0; index -= 1) {
+          const swapIndex = randomIndex(index + 1);
+          [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
         }
+        return result;
+      }
+
+      function drawKeyIndex() {
+        if (!keyBag.length) {
+          keyBag = shuffled(Array.from({ length: KEYS.length }, (_, index) => index));
+          if (keyBag[0] === previousKeyIndex && keyBag.length > 1) {
+            const swapIndex = 1 + randomIndex(keyBag.length - 1);
+            [keyBag[0], keyBag[swapIndex]] = [keyBag[swapIndex], keyBag[0]];
+          }
+        }
+        const keyIndex = keyBag.shift();
         previousKeyIndex = keyIndex;
+        return keyIndex;
+      }
+
+      function drawDegree(eligibleDegrees) {
+        const signature = eligibleDegrees.join(',');
+        if (signature !== degreeBagSignature) {
+          degreeBag = [];
+          degreeBagSignature = signature;
+        }
+        if (!degreeBag.length) degreeBag = shuffled(eligibleDegrees);
+        return degreeBag.shift();
+      }
+
+      function buildRound() {
+        const keyIndex = drawKeyIndex();
         const key = KEYS[keyIndex];
         const excludedIntervals = new Set(session.excludedIntervals);
         const eligibleDegrees = session.mode.intervals
@@ -1301,7 +1332,7 @@
           .map(choice => choice.index);
         const degrees = Array.from(
           { length: session.sequenceLength },
-          () => eligibleDegrees[randomIndex(eligibleDegrees.length)]
+          () => drawDegree(eligibleDegrees)
         );
         const intervals = degrees.map(degree => session.mode.intervals[degree]);
         const windowCount = session.rangeMax - session.rangeMin - 10;
@@ -1542,6 +1573,9 @@
         clearPlayback();
         currentRound = null;
         lastRoundCorrect = null;
+        keyBag = [];
+        degreeBag = [];
+        degreeBagSignature = '';
         roundNumber = 0;
         score = 0;
         attempts = 0;
