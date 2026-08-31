@@ -1004,8 +1004,7 @@
       let timers = [];
       let previousKeyIndex = null;
       let keyBag = [];
-      let degreeBag = [];
-      let degreeBagSignature = '';
+      let degreeHistory = [];
       let lastRoundCorrect = null;
       const activeOscillators = new Set();
       let session = {
@@ -1290,6 +1289,15 @@
         return Math.floor(Math.random() * length);
       }
 
+      function randomUnit() {
+        if (window.crypto && window.crypto.getRandomValues) {
+          const value = new Uint32Array(1);
+          window.crypto.getRandomValues(value);
+          return value[0] / 4294967296;
+        }
+        return Math.random();
+      }
+
       function shuffled(values) {
         const result = [...values];
         for (let index = result.length - 1; index > 0; index -= 1) {
@@ -1313,13 +1321,24 @@
       }
 
       function drawDegree(eligibleDegrees) {
-        const signature = eligibleDegrees.join(',');
-        if (signature !== degreeBagSignature) {
-          degreeBag = [];
-          degreeBagSignature = signature;
-        }
-        if (!degreeBag.length) degreeBag = shuffled(eligibleDegrees);
-        return degreeBag.shift();
+        const historyLimit = Math.max(8, eligibleDegrees.length * 2);
+        const recentHistory = degreeHistory.slice(-historyLimit);
+        const previousDegree = degreeHistory[degreeHistory.length - 1];
+        const weightedChoices = eligibleDegrees.map(degree => {
+          const recentCount = recentHistory.filter(item => item === degree).length;
+          let weight = 1 / (1 + recentCount * 0.7);
+          if (degree === previousDegree) weight *= 0.45;
+          return { degree, weight };
+        });
+        const totalWeight = weightedChoices.reduce((sum, choice) => sum + choice.weight, 0);
+        let cursor = randomUnit() * totalWeight;
+        const selected = weightedChoices.find(choice => {
+          cursor -= choice.weight;
+          return cursor <= 0;
+        })?.degree ?? weightedChoices[weightedChoices.length - 1].degree;
+        degreeHistory.push(selected);
+        if (degreeHistory.length > historyLimit) degreeHistory = degreeHistory.slice(-historyLimit);
+        return selected;
       }
 
       function buildRound() {
@@ -1574,8 +1593,7 @@
         currentRound = null;
         lastRoundCorrect = null;
         keyBag = [];
-        degreeBag = [];
-        degreeBagSignature = '';
+        degreeHistory = [];
         roundNumber = 0;
         score = 0;
         attempts = 0;
