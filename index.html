@@ -1512,9 +1512,9 @@
       function scheduleReferenceSequence(midis, start) {
         midis.forEach((midi, index) => {
           const isLast = index === midis.length - 1;
-          scheduleTone(midi, start + index * 0.25, isLast ? 0.5 : 0.23, 0.25);
+          scheduleTone(midi, start + index * 0.5, isLast ? 1.0 : 0.46, 0.25);
         });
-        return start + (midis.length - 1) * 0.25 + 0.5;
+        return start + (midis.length - 1) * 0.5 + 1.0;
       }
 
       function playReferencePattern() {
