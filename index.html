@@ -306,30 +306,26 @@
     .result-actions .secondary { width: auto; padding: 0 18px; font-size: 13px; }
 
     .stats-panel { width: 100%; }
-    .stats-summary {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--line);
-      font: 500 12px/1 "DM Mono", monospace;
-    }
-
-    .stats-list { display: grid; gap: 10px; }
-
-    .stats-row {
-      display: grid;
-      grid-template-columns: 52px minmax(80px, 1fr) 48px 72px;
-      align-items: center;
-      gap: 10px;
-      min-height: 30px;
-    }
-
-    .stats-name { font-weight: 700; }
-    .stats-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--paper-deep); }
-    .stats-bar-fill { height: 100%; border-radius: inherit; background: var(--orange); }
-    .stats-rate { text-align: right; font: 500 12px/1 "DM Mono", monospace; }
-    .stats-count { color: rgba(23, 22, 20, 0.5); text-align: right; font: 400 10px/1 "DM Mono", monospace; }
+    .analysis-content { margin: 26px 0 30px; text-align: left; }
+    .analysis-overview { display: flex; justify-content: space-between; margin-bottom: 14px; font: 500 12px/1 "DM Mono", monospace; }
+    .analysis-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .analysis-metric { padding: 13px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.38); }
+    .analysis-metric-label { display: block; min-height: 2.5em; color: rgba(23, 22, 20, 0.55); font-size: 10px; line-height: 1.25; }
+    .analysis-metric-value { display: block; margin-top: 7px; font: 500 18px/1 "DM Mono", monospace; }
+    .analysis-section { margin-top: 25px; }
+    .analysis-section h3 { margin: 0 0 9px; font-size: 13px; }
+    .confusion-summary { margin: 0; padding: 13px 14px; border-left: 3px solid var(--orange); background: var(--paper-deep); font: 500 13px/1.5 "DM Mono", monospace; }
+    .data-table-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .data-table { width: 100%; border-collapse: collapse; white-space: nowrap; font-size: 11px; }
+    .data-table th, .data-table td { min-width: 42px; padding: 8px 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: center; }
+    .data-table th { background: var(--paper-deep); font-weight: 700; }
+    .data-table th:first-child, .data-table td:first-child { position: sticky; left: 0; z-index: 1; background: var(--paper); text-align: left; }
+    .data-table thead th:first-child { z-index: 2; background: var(--paper-deep); }
+    .data-table tr:last-child td { border-bottom: 0; }
+    .data-table th:last-child, .data-table td:last-child { border-right: 0; }
+    .data-table small { display: block; margin-top: 3px; color: rgba(23, 22, 20, 0.48); font: 400 9px/1 "DM Mono", monospace; }
+    .note-stats-table th:first-child, .note-stats-table td:first-child { min-width: 54px; }
+    .key-stats-table th:first-child, .key-stats-table td:first-child { min-width: 48px; }
     .stats-back { margin-top: 25px; }
     .stats-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 25px; }
     .stats-actions .stats-back { margin-top: 0; }
@@ -671,7 +667,8 @@
       .mode-option label { min-height: 65px; padding: 11px 13px; }
       .setup-actions { grid-template-columns: 1fr; }
       .setup-actions .secondary { min-height: 46px; }
-      .stats-row { grid-template-columns: 43px minmax(65px, 1fr) 43px 60px; gap: 7px; }
+      .analysis-metrics { grid-template-columns: 1fr; }
+      .analysis-metric-label { min-height: 0; }
       .topbar { grid-template-columns: 1fr repeat(2, auto); min-height: 62px; }
       .phase-label { padding: 0 16px; font-size: 13px; }
       .phase-label #phaseText { display: none; }
@@ -821,6 +818,7 @@
             <p class="result-kicker">SESSION COMPLETE</p>
             <p class="result-score"><span id="resultScore">0</span><small>%</small></p>
             <p class="result-caption" id="resultCaption"></p>
+            <div class="analysis-content" id="sessionStatsContent"></div>
             <div class="result-actions">
               <button class="primary" id="retryButton" type="button">同じ設定でもう一度</button>
               <button class="secondary" id="settingsButton" type="button">設定を変える</button>
@@ -829,11 +827,7 @@
           </div>
 
           <div class="stats-panel" id="statsPanel" hidden>
-            <div class="stats-summary">
-              <span id="statsTotal">0音</span>
-              <span id="statsAccuracy">—</span>
-            </div>
-            <div class="stats-list" id="statsList"></div>
+            <div class="analysis-content" id="lifetimeStatsContent"></div>
             <div class="stats-actions">
               <button class="secondary stats-back" id="statsBackButton" type="button">← 戻る</button>
               <button class="secondary stats-reset" id="statsResetButton" type="button">統計をリセット</button>
@@ -961,9 +955,8 @@
       const rangeMaxValue = document.querySelector('#rangeMaxValue');
       const resultPanel = document.querySelector('#resultPanel');
       const statsPanel = document.querySelector('#statsPanel');
-      const statsList = document.querySelector('#statsList');
-      const statsTotal = document.querySelector('#statsTotal');
-      const statsAccuracy = document.querySelector('#statsAccuracy');
+      const sessionStatsContent = document.querySelector('#sessionStatsContent');
+      const lifetimeStatsContent = document.querySelector('#lifetimeStatsContent');
       const statisticsButton = document.querySelector('#statisticsButton');
       const resultStatsButton = document.querySelector('#resultStatsButton');
       const statsBackButton = document.querySelector('#statsBackButton');
@@ -1035,13 +1028,25 @@
       volumeSlider.value = String(Math.round(masterVolume * 100));
       volumeValue.textContent = volumeSlider.value;
 
-      const STATS_STORAGE_KEY = 'tonic-ear-training-stats-v1';
+      const STATS_STORAGE_KEY = 'tonic-ear-training-stats-v2';
 
       function emptyStats() {
         return {
+          version: 2,
           total: 0,
           correct: 0,
-          notes: Array.from({ length: 12 }, () => ({ total: 0, correct: 0 }))
+          notes: Array.from({ length: 12 }, () => ({ total: 0, correct: 0 })),
+          confusion: Array.from({ length: 12 }, () => Array(12).fill(0)),
+          keys: Array.from({ length: 12 }, () =>
+            Array.from({ length: 12 }, () => ({ total: 0, correct: 0 }))
+          ),
+          questions: {
+            total: 0,
+            correct: 0,
+            totalPlays: 0,
+            correctPlays: 0,
+            onePlayCorrect: 0
+          }
         };
       }
 
@@ -1049,51 +1054,143 @@
         const fallback = emptyStats();
         try {
           const saved = JSON.parse(localStorage.getItem(STATS_STORAGE_KEY));
-          if (!saved || !Array.isArray(saved.notes)) return fallback;
+          if (!saved || saved.version !== 2 || !Array.isArray(saved.notes)) return fallback;
           fallback.total = Number(saved.total) || 0;
           fallback.correct = Number(saved.correct) || 0;
           fallback.notes.forEach((note, index) => {
             note.total = Number(saved.notes[index]?.total) || 0;
             note.correct = Number(saved.notes[index]?.correct) || 0;
           });
+          fallback.confusion.forEach((row, target) => {
+            row.forEach((_, answer) => {
+              row[answer] = Number(saved.confusion?.[target]?.[answer]) || 0;
+            });
+          });
+          fallback.keys.forEach((key, keyIndex) => {
+            key.forEach((note, interval) => {
+              note.total = Number(saved.keys?.[keyIndex]?.[interval]?.total) || 0;
+              note.correct = Number(saved.keys?.[keyIndex]?.[interval]?.correct) || 0;
+            });
+          });
+          Object.keys(fallback.questions).forEach(name => {
+            fallback.questions[name] = Number(saved.questions?.[name]) || 0;
+          });
         } catch (_) {}
         return fallback;
       }
 
       let lifetimeStats = loadStats();
+      let sessionStats = emptyStats();
+      try { localStorage.removeItem('tonic-ear-training-stats-v1'); } catch (_) {}
 
       function saveStats() {
         try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(lifetimeStats)); } catch (_) {}
       }
 
-      function recordAnswer(interval, isCorrect) {
-        lifetimeStats.total += 1;
-        lifetimeStats.notes[interval].total += 1;
+      function addAnswerToStats(stats, targetInterval, answerInterval, isCorrect, keyIndex) {
+        stats.total += 1;
+        stats.notes[targetInterval].total += 1;
+        stats.confusion[targetInterval][answerInterval] += 1;
+        stats.keys[keyIndex][targetInterval].total += 1;
         if (isCorrect) {
-          lifetimeStats.correct += 1;
-          lifetimeStats.notes[interval].correct += 1;
+          stats.correct += 1;
+          stats.notes[targetInterval].correct += 1;
+          stats.keys[keyIndex][targetInterval].correct += 1;
         }
+      }
+
+      function recordAnswer(targetInterval, answerInterval, isCorrect, keyIndex) {
+        addAnswerToStats(sessionStats, targetInterval, answerInterval, isCorrect, keyIndex);
+        addAnswerToStats(lifetimeStats, targetInterval, answerInterval, isCorrect, keyIndex);
+      }
+
+      function addQuestionToStats(stats, isCorrect, playCount) {
+        stats.questions.total += 1;
+        stats.questions.totalPlays += playCount;
+        if (isCorrect) {
+          stats.questions.correct += 1;
+          stats.questions.correctPlays += playCount;
+          if (playCount === 1) stats.questions.onePlayCorrect += 1;
+        }
+      }
+
+      function recordQuestion(isCorrect, playCount) {
+        addQuestionToStats(sessionStats, isCorrect, playCount);
+        addQuestionToStats(lifetimeStats, isCorrect, playCount);
         saveStats();
       }
 
-      function renderStats() {
-        const names = MODES.chromatic.names;
-        statsTotal.textContent = `${lifetimeStats.total}音`;
-        statsAccuracy.textContent = lifetimeStats.total
-          ? `正解率 ${Math.round((lifetimeStats.correct / lifetimeStats.total) * 100)}%`
-          : '正解率 —';
-        statsList.replaceChildren();
-        lifetimeStats.notes.forEach((note, index) => {
-          const rate = note.total ? Math.round((note.correct / note.total) * 100) : null;
-          const row = document.createElement('div');
-          row.className = 'stats-row';
-          row.innerHTML = `
-            <span class="stats-name">${names[index]}</span>
-            <span class="stats-bar"><span class="stats-bar-fill" style="width:${rate ?? 0}%"></span></span>
-            <span class="stats-rate">${rate === null ? '—' : `${rate}%`}</span>
-            <span class="stats-count">${note.correct}/${note.total}</span>`;
-          statsList.appendChild(row);
+      function formatAverage(total, count) {
+        return count ? `${(total / count).toFixed(2)}回` : '—';
+      }
+
+      function rateText(correct, total) {
+        return total ? `${Math.round((correct / total) * 100)}%` : '—';
+      }
+
+      function mostCommonMistake(stats) {
+        let best = null;
+        stats.confusion.forEach((row, target) => {
+          row.forEach((count, answer) => {
+            if (target !== answer && count > 0 && (!best || count > best.count)) {
+              best = { target, answer, count };
+            }
+          });
         });
+        return best;
+      }
+
+      function renderAnalytics(stats, container, detailed = false) {
+        const names = MODES.chromatic.names;
+        const questions = stats.questions;
+        const mistake = mostCommonMistake(stats);
+        const noteRows = stats.notes.map((note, index) => `
+          <tr><th scope="row">${names[index]}</th><td>${rateText(note.correct, note.total)}</td><td>${note.correct}/${note.total}</td></tr>`).join('');
+        const confusionHead = names.map(name => `<th scope="col">${name}</th>`).join('');
+        const confusionRows = stats.confusion.map((row, target) => `
+          <tr><th scope="row">${names[target]}</th>${row.map(count => `<td>${count || '—'}</td>`).join('')}</tr>`).join('');
+        const keyRows = stats.keys.map((keyNotes, keyIndex) => `
+          <tr><th scope="row">${KEYS[keyIndex].name.replace('メジャー', '')}</th>${keyNotes.map(note =>
+            `<td>${rateText(note.correct, note.total)}<small>${note.correct}/${note.total}</small></td>`
+          ).join('')}</tr>`).join('');
+
+        container.innerHTML = `
+          ${detailed ? `<div class="analysis-overview"><span>${stats.total}音</span><span>正解率 ${rateText(stats.correct, stats.total)}</span></div>` : ''}
+          <div class="analysis-metrics">
+            <div class="analysis-metric"><span class="analysis-metric-label">全体の平均再生回数</span><span class="analysis-metric-value">${formatAverage(questions.totalPlays, questions.total)}</span></div>
+            <div class="analysis-metric"><span class="analysis-metric-label">正解時の平均再生回数</span><span class="analysis-metric-value">${formatAverage(questions.correctPlays, questions.correct)}</span></div>
+            <div class="analysis-metric"><span class="analysis-metric-label">一発再生で正解できた回数</span><span class="analysis-metric-value">${questions.onePlayCorrect}回</span></div>
+          </div>
+          <section class="analysis-section">
+            <h3>各音の正答率</h3>
+            <div class="data-table-wrap"><table class="data-table note-stats-table">
+              <thead><tr><th scope="col">音</th><th scope="col">正答率</th><th scope="col">正解/出題</th></tr></thead>
+              <tbody>${noteRows}</tbody>
+            </table></div>
+          </section>
+          <section class="analysis-section">
+            <h3>最も多い間違い</h3>
+            <p class="confusion-summary">${mistake ? `${names[mistake.target]} → ${names[mistake.answer]}（${mistake.count}回）` : 'なし'}</p>
+          </section>
+          ${detailed ? `
+            <section class="analysis-section">
+              <h3>回答傾向（行：正解／列：回答）</h3>
+              <div class="data-table-wrap"><table class="data-table confusion-table">
+                <thead><tr><th scope="col">正解＼回答</th>${confusionHead}</tr></thead>
+                <tbody>${confusionRows}</tbody>
+              </table></div>
+            </section>
+            <section class="analysis-section">
+              <h3>調別・各音の正答率</h3>
+              <div class="data-table-wrap"><table class="data-table key-stats-table">
+                <thead><tr><th scope="col">調</th>${confusionHead}</tr></thead>
+                <tbody>${keyRows}</tbody>
+              </table></div>
+            </section>` : ''}`;
+      }
+
+      function renderStats() {
+        renderAnalytics(lifetimeStats, lifetimeStatsContent, true);
       }
 
       function renderKeyboard() {
@@ -1367,11 +1464,13 @@
           return windowStart + ((pitchClass - (windowStart % 12) + 12) % 12);
         });
         return {
+          keyIndex,
           key,
           degrees,
           intervals,
           targetMidis,
-          windowStart
+          windowStart,
+          playCount: 0
         };
       }
 
@@ -1385,6 +1484,7 @@
         ensureAudio();
         clearPlayback();
         if (!reviewMode) {
+          currentRound.playCount += 1;
           userAnswers = [];
           resetKeyStyles();
         }
@@ -1564,7 +1664,15 @@
         const positionResults = userAnswers.map((answerIndex, index) => answerIndex === currentRound.degrees[index]);
         const correct = positionResults.every(Boolean);
         lastRoundCorrect = correct;
-        currentRound.intervals.forEach((interval, index) => recordAnswer(interval, positionResults[index]));
+        currentRound.intervals.forEach((interval, index) => {
+          recordAnswer(
+            interval,
+            session.mode.intervals[userAnswers[index]],
+            positionResults[index],
+            currentRound.keyIndex
+          );
+        });
+        recordQuestion(correct, currentRound.playCount);
 
         const answerNames = userAnswers.map(index => session.mode.names[index]);
         const correctNames = currentRound.degrees.map(index => session.mode.names[index]);
@@ -1651,6 +1759,7 @@
         score = 0;
         attempts = 0;
         streak = 0;
+        sessionStats = emptyStats();
         state = 'idle';
         scoreNode.textContent = '0';
         attemptsNode.textContent = '0';
@@ -1682,6 +1791,7 @@
         resultScore.textContent = percentage;
         const exclusionSetting = session.excludedIntervals.length ? ` · ${session.excludedIntervals.length}音除外` : '';
         resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
+        renderAnalytics(sessionStats, sessionStatsContent);
         setupNumber.textContent = 'RESULT';
         setupTitle.textContent = '結果';
         setupNote.textContent = '';
