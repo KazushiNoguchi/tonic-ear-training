@@ -470,6 +470,7 @@
     }
 
     .reset-input-button { width: auto; padding: 0 15px; font-size: 12px; }
+    .reference-pattern-button { width: auto; padding: 0 15px; font-size: 12px; }
 
     .primary:hover:not(:disabled), .secondary:hover:not(:disabled) { transform: translateY(-2px); }
     .primary:active:not(:disabled), .secondary:active:not(:disabled) { transform: translateY(1px); }
@@ -868,6 +869,7 @@
             <button class="primary" id="nextButton" type="button" disabled>再生中…</button>
             <button class="secondary" id="replayButton" type="button" aria-label="もう一度聴く" title="もう一度聴く" disabled>↻</button>
             <button class="secondary reset-input-button" id="clearAnswerButton" type="button" disabled hidden>入力をやり直す</button>
+            <button class="secondary reference-pattern-button" id="referencePatternButton" type="button" hidden>ド基準フレーズ</button>
           </div>
         </div>
 
@@ -976,6 +978,7 @@
       const settingsButton = document.querySelector('#settingsButton');
       const replayButton = document.querySelector('#replayButton');
       const clearAnswerButton = document.querySelector('#clearAnswerButton');
+      const referencePatternButton = document.querySelector('#referencePatternButton');
       const nextButton = document.querySelector('#nextButton');
       const phaseText = document.querySelector('#phaseText');
       const headline = document.querySelector('#headline');
@@ -1154,7 +1157,7 @@
         if (!samples) return Promise.resolve();
 
         pianoLoadPromise = Promise.all(
-          Array.from({ length: 73 }, (_, index) => index + 30).map(async midi => {
+          Array.from({ length: 88 }, (_, index) => index + 21).map(async midi => {
             const dataUri = samples[midiToSampleName(midi)];
             if (!dataUri) return;
             const buffer = await audioContext.decodeAudioData(dataUriToArrayBuffer(dataUri));
@@ -1392,6 +1395,7 @@
         replayButton.disabled = true;
         clearAnswerButton.disabled = true;
         clearAnswerButton.hidden = session.sequenceLength === 1;
+        referencePatternButton.hidden = true;
         game.classList.add('is-playing');
         state = 'playing';
         phaseText.textContent = '基準コードを再生中';
@@ -1434,6 +1438,7 @@
             setSequence(-1, 2);
             feedback.classList.add('visible');
             replayButton.disabled = false;
+            referencePatternButton.hidden = false;
             nextButton.disabled = false;
             nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
             liveRegion.textContent = '再生が終わりました。';
@@ -1501,6 +1506,50 @@
         scaleSteps.forEach((step, index) => {
           const isFinalTonic = index === scaleSteps.length - 1;
           scheduleTone(tonicMidi + step, start + index * 0.25, isFinalTonic ? 0.5 : 0.23, 0.25);
+        });
+      }
+
+      function scheduleReferenceSequence(midis, start) {
+        midis.forEach((midi, index) => {
+          const isLast = index === midis.length - 1;
+          scheduleTone(midi, start + index * 0.25, isLast ? 0.5 : 0.23, 0.25);
+        });
+        return start + (midis.length - 1) * 0.25 + 0.5;
+      }
+
+      function playReferencePattern() {
+        if (state !== 'feedback' || !currentRound) return;
+        clearPlayback();
+        ensureAudio();
+        state = 'reference';
+        game.classList.add('is-playing');
+        phaseText.textContent = 'ド基準フレーズ';
+        nextButton.disabled = true;
+        replayButton.disabled = true;
+        referencePatternButton.disabled = true;
+
+        const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
+        const highTonic = lowTonic + 12;
+        const firstSequence = [lowTonic];
+        MAJOR_STEPS.slice(1).forEach(step => firstSequence.push(lowTonic + step, lowTonic));
+        firstSequence.push(highTonic);
+
+        const secondSequence = [highTonic];
+        MAJOR_STEPS.forEach(step => secondSequence.push(lowTonic + step, highTonic));
+
+        const now = audioContext.currentTime + 0.03;
+        const firstEnd = scheduleReferenceSequence(firstSequence, now);
+        const secondEnd = scheduleReferenceSequence(secondSequence, firstEnd + 0.35);
+        const playbackToken = playbackId;
+        scheduleUi(secondEnd - audioContext.currentTime + 0.05, () => {
+          if (playbackToken !== playbackId) return;
+          state = 'feedback';
+          game.classList.remove('is-playing');
+          phaseText.textContent = lastRoundCorrect ? '正解' : '不正解';
+          nextButton.disabled = false;
+          replayButton.disabled = false;
+          referencePatternButton.disabled = false;
+          liveRegion.textContent = 'ド基準フレーズの再生が終わりました。';
         });
       }
 
@@ -1572,6 +1621,7 @@
         nextButton.disabled = false;
         replayButton.disabled = false;
         clearAnswerButton.hidden = true;
+        referencePatternButton.hidden = false;
         nextButton.focus();
       }
 
@@ -1608,6 +1658,7 @@
         accuracyNode.textContent = '—';
         feedback.classList.remove('visible');
         game.classList.remove('is-playing');
+        referencePatternButton.hidden = true;
         renderKeyboard();
       }
 
@@ -1737,6 +1788,8 @@
         if (state === 'answering') playRound();
         else if (state === 'feedback') playRound(true);
       });
+
+      referencePatternButton.addEventListener('click', playReferencePattern);
 
       clearAnswerButton.addEventListener('click', () => {
         if (state !== 'answering' || userAnswers.length === 0) return;
