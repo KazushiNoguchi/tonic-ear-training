@@ -307,9 +307,11 @@
 
     .stats-panel { width: 100%; }
     .analysis-content { margin: 26px 0 30px; text-align: left; }
-    .stats-mode-block + .stats-mode-block { margin-top: 38px; padding-top: 34px; border-top: 1px solid var(--ink); }
-    .stats-mode-title { margin: 0 0 18px; font-size: 18px; }
-    .stats-mode-body .analysis-content { margin: 0; }
+    .stats-mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 22px; }
+    .stats-mode-tab { min-height: 42px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: var(--ink); cursor: pointer; font-weight: 700; }
+    .stats-mode-tab:hover { border-color: var(--ink); }
+    .stats-mode-tab[aria-selected="true"] { border-color: var(--ink); background: var(--mint); box-shadow: 2px 2px 0 var(--ink); }
+    .stats-mode-tab:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
     .analysis-overview { display: flex; justify-content: space-between; margin-bottom: 14px; font: 500 12px/1 "DM Mono", monospace; }
     .analysis-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .analysis-metric { padding: 13px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.38); }
@@ -1019,6 +1021,7 @@
       let keyButtons = [];
       let userAnswers = [];
       let statsReturnView = 'settings';
+      let statsModeLength = 1;
       const pianoBuffers = new Map();
       let pianoLoadPromise = null;
 
@@ -1212,18 +1215,30 @@
 
       function renderStats() {
         lifetimeStatsContent.replaceChildren();
-        [1, 2, 3].forEach(length => {
-          const section = document.createElement('section');
-          section.className = 'stats-mode-block';
-          const title = document.createElement('h2');
-          title.className = 'stats-mode-title';
-          title.textContent = length === 1 ? '単音モード' : `${length}音モード`;
-          const body = document.createElement('div');
-          body.className = 'stats-mode-body';
-          section.append(title, body);
-          lifetimeStatsContent.appendChild(section);
-          renderAnalytics(lifetimeStats.modes[length], body, true);
+        const tabs = document.createElement('div');
+        tabs.className = 'stats-mode-tabs';
+        tabs.setAttribute('role', 'tablist');
+        tabs.setAttribute('aria-label', 'モード別統計');
+        const body = document.createElement('div');
+        body.id = 'statsModePanel';
+        body.setAttribute('role', 'tabpanel');
+        const buttons = [1, 2, 3].map(length => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'stats-mode-tab';
+          button.setAttribute('role', 'tab');
+          button.setAttribute('aria-controls', body.id);
+          button.textContent = length === 1 ? '単音' : `${length}音`;
+          button.addEventListener('click', () => {
+            statsModeLength = length;
+            buttons.forEach((item, index) => item.setAttribute('aria-selected', String(index + 1 === length)));
+            renderAnalytics(lifetimeStats.modes[length], body, true);
+          });
+          tabs.appendChild(button);
+          return button;
         });
+        lifetimeStatsContent.append(tabs, body);
+        buttons[statsModeLength - 1].click();
       }
 
       function renderKeyboard() {
@@ -1844,6 +1859,7 @@
 
       function showStats(returnView) {
         statsReturnView = returnView;
+        if (returnView === 'result') statsModeLength = session.sequenceLength;
         settingsForm.hidden = true;
         resultPanel.hidden = true;
         statsPanel.hidden = false;
