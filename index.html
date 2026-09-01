@@ -1321,6 +1321,9 @@
       }
 
       function drawDegree(eligibleDegrees) {
+        if (eligibleDegrees.length <= 5) {
+          return eligibleDegrees[randomIndex(eligibleDegrees.length)];
+        }
         const historyLimit = Math.max(8, eligibleDegrees.length * 2);
         const recentHistory = degreeHistory.slice(-historyLimit);
         const previousDegree = degreeHistory[degreeHistory.length - 1];
