@@ -473,6 +473,7 @@
 
     .reset-input-button { width: auto; padding: 0 15px; font-size: 12px; }
     .reference-pattern-button { width: auto; padding: 0 15px; font-size: 12px; }
+    .reference-pattern-button.is-stop { border-color: var(--red); color: var(--red); }
     .reference-speed-control { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; font: 500 10px/1 "DM Mono", monospace; }
     .reference-speed-control[hidden] { display: none; }
     .reference-speed-control input { width: 105px; accent-color: var(--orange); cursor: pointer; }
@@ -1696,6 +1697,25 @@
         return start + (midis.length - 1) * step + step * 2;
       }
 
+      function restoreReferenceControls(message) {
+        state = 'feedback';
+        game.classList.remove('is-playing');
+        phaseText.textContent = lastRoundCorrect ? '正解' : '不正解';
+        nextButton.disabled = false;
+        replayButton.disabled = false;
+        referencePatternButton.disabled = false;
+        referencePatternButton.textContent = 'ド基準フレーズ';
+        referencePatternButton.classList.remove('is-stop');
+        referenceSpeedInput.disabled = false;
+        liveRegion.textContent = message;
+      }
+
+      function stopReferencePattern() {
+        if (state !== 'reference') return;
+        clearPlayback();
+        restoreReferenceControls('ド基準フレーズを停止しました。');
+      }
+
       function playReferencePattern() {
         if (state !== 'feedback' || !currentRound) return;
         clearPlayback();
@@ -1705,7 +1725,9 @@
         phaseText.textContent = 'ド基準フレーズ';
         nextButton.disabled = true;
         replayButton.disabled = true;
-        referencePatternButton.disabled = true;
+        referencePatternButton.disabled = false;
+        referencePatternButton.textContent = '停止';
+        referencePatternButton.classList.add('is-stop');
         referenceSpeedInput.disabled = true;
 
         const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
@@ -1723,14 +1745,7 @@
         const playbackToken = playbackId;
         scheduleUi(secondEnd - audioContext.currentTime + 0.05, () => {
           if (playbackToken !== playbackId) return;
-          state = 'feedback';
-          game.classList.remove('is-playing');
-          phaseText.textContent = lastRoundCorrect ? '正解' : '不正解';
-          nextButton.disabled = false;
-          replayButton.disabled = false;
-          referencePatternButton.disabled = false;
-          referenceSpeedInput.disabled = false;
-          liveRegion.textContent = 'ド基準フレーズの再生が終わりました。';
+          restoreReferenceControls('ド基準フレーズの再生が終わりました。');
         });
       }
 
@@ -1850,6 +1865,8 @@
         feedback.classList.remove('visible');
         game.classList.remove('is-playing');
         referencePatternButton.hidden = true;
+        referencePatternButton.textContent = 'ド基準フレーズ';
+        referencePatternButton.classList.remove('is-stop');
         referenceSpeedControl.hidden = true;
         referenceSpeedInput.disabled = false;
         renderKeyboard();
@@ -1984,7 +2001,10 @@
         else if (state === 'feedback') playRound(true);
       });
 
-      referencePatternButton.addEventListener('click', playReferencePattern);
+      referencePatternButton.addEventListener('click', () => {
+        if (state === 'reference') stopReferencePattern();
+        else playReferencePattern();
+      });
 
       clearAnswerButton.addEventListener('click', () => {
         if (state !== 'answering' || userAnswers.length === 0) return;
