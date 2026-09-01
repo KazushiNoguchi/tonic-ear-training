@@ -439,6 +439,7 @@
 
     .transport {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 11px;
       margin-top: 28px;
@@ -472,6 +473,11 @@
 
     .reset-input-button { width: auto; padding: 0 15px; font-size: 12px; }
     .reference-pattern-button { width: auto; padding: 0 15px; font-size: 12px; }
+    .reference-speed-control { display: flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; font: 500 10px/1 "DM Mono", monospace; }
+    .reference-speed-control[hidden] { display: none; }
+    .reference-speed-control input { width: 105px; accent-color: var(--orange); cursor: pointer; }
+    .reference-speed-control input:disabled { cursor: not-allowed; opacity: 0.45; }
+    .reference-speed-control output { min-width: 45px; text-align: right; }
 
     .primary:hover:not(:disabled), .secondary:hover:not(:disabled) { transform: translateY(-2px); }
     .primary:active:not(:disabled), .secondary:active:not(:disabled) { transform: translateY(1px); }
@@ -674,6 +680,8 @@
       .setup-actions .secondary { min-height: 46px; }
       .analysis-metrics { grid-template-columns: 1fr; }
       .analysis-metric-label { min-height: 0; }
+      .reference-speed-control { flex-basis: 100%; justify-content: space-between; }
+      .reference-speed-control input { flex: 1; }
       .topbar { grid-template-columns: 1fr repeat(2, auto); min-height: 62px; }
       .phase-label { padding: 0 16px; font-size: 13px; }
       .phase-label #phaseText { display: none; }
@@ -869,6 +877,11 @@
             <button class="secondary" id="replayButton" type="button" aria-label="もう一度聴く" title="もう一度聴く" disabled>↻</button>
             <button class="secondary reset-input-button" id="clearAnswerButton" type="button" disabled hidden>入力をやり直す</button>
             <button class="secondary reference-pattern-button" id="referencePatternButton" type="button" hidden>ド基準フレーズ</button>
+            <label class="reference-speed-control" id="referenceSpeedControl" for="referenceSpeed" hidden>
+              <span>1音</span>
+              <input id="referenceSpeed" type="range" min="0.25" max="1" step="0.05" value="0.5">
+              <output id="referenceSpeedValue" for="referenceSpeed">0.50秒</output>
+            </label>
           </div>
         </div>
 
@@ -977,6 +990,9 @@
       const replayButton = document.querySelector('#replayButton');
       const clearAnswerButton = document.querySelector('#clearAnswerButton');
       const referencePatternButton = document.querySelector('#referencePatternButton');
+      const referenceSpeedControl = document.querySelector('#referenceSpeedControl');
+      const referenceSpeedInput = document.querySelector('#referenceSpeed');
+      const referenceSpeedValue = document.querySelector('#referenceSpeedValue');
       const nextButton = document.querySelector('#nextButton');
       const phaseText = document.querySelector('#phaseText');
       const headline = document.querySelector('#headline');
@@ -1033,6 +1049,17 @@
       } catch (_) {}
       volumeSlider.value = String(Math.round(masterVolume * 100));
       volumeValue.textContent = volumeSlider.value;
+
+      const REFERENCE_SPEED_STORAGE_KEY = 'tonic-ear-training-reference-speed';
+      let referenceNoteSeconds = 0.5;
+      try {
+        const savedReferenceSpeed = Number(localStorage.getItem(REFERENCE_SPEED_STORAGE_KEY));
+        if (Number.isFinite(savedReferenceSpeed) && savedReferenceSpeed >= 0.25 && savedReferenceSpeed <= 1) {
+          referenceNoteSeconds = savedReferenceSpeed;
+        }
+      } catch (_) {}
+      referenceSpeedInput.value = String(referenceNoteSeconds);
+      referenceSpeedValue.textContent = `${referenceNoteSeconds.toFixed(2)}秒`;
 
       const STATS_STORAGE_KEY = 'tonic-ear-training-stats-v3';
 
@@ -1544,6 +1571,8 @@
         clearAnswerButton.disabled = true;
         clearAnswerButton.hidden = session.sequenceLength === 1;
         referencePatternButton.hidden = true;
+        referenceSpeedControl.hidden = true;
+        referenceSpeedInput.disabled = false;
         game.classList.add('is-playing');
         state = 'playing';
         phaseText.textContent = '基準コードを再生中';
@@ -1587,6 +1616,7 @@
             feedback.classList.add('visible');
             replayButton.disabled = false;
             referencePatternButton.hidden = false;
+            referenceSpeedControl.hidden = false;
             nextButton.disabled = false;
             nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
             liveRegion.textContent = '再生が終わりました。';
@@ -1658,11 +1688,12 @@
       }
 
       function scheduleReferenceSequence(midis, start) {
+        const step = referenceNoteSeconds;
         midis.forEach((midi, index) => {
           const isLast = index === midis.length - 1;
-          scheduleTone(midi, start + index * 0.5, isLast ? 1.0 : 0.46, 0.25);
+          scheduleTone(midi, start + index * step, isLast ? step * 2 : step * 0.92, 0.25);
         });
-        return start + (midis.length - 1) * 0.5 + 1.0;
+        return start + (midis.length - 1) * step + step * 2;
       }
 
       function playReferencePattern() {
@@ -1675,6 +1706,7 @@
         nextButton.disabled = true;
         replayButton.disabled = true;
         referencePatternButton.disabled = true;
+        referenceSpeedInput.disabled = true;
 
         const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
         const highTonic = lowTonic + 12;
@@ -1687,7 +1719,7 @@
 
         const now = audioContext.currentTime + 0.03;
         const firstEnd = scheduleReferenceSequence(firstSequence, now);
-        const secondEnd = scheduleReferenceSequence(secondSequence, firstEnd + 0.35);
+        const secondEnd = scheduleReferenceSequence(secondSequence, firstEnd + referenceNoteSeconds * 0.7);
         const playbackToken = playbackId;
         scheduleUi(secondEnd - audioContext.currentTime + 0.05, () => {
           if (playbackToken !== playbackId) return;
@@ -1697,6 +1729,7 @@
           nextButton.disabled = false;
           replayButton.disabled = false;
           referencePatternButton.disabled = false;
+          referenceSpeedInput.disabled = false;
           liveRegion.textContent = 'ド基準フレーズの再生が終わりました。';
         });
       }
@@ -1778,6 +1811,7 @@
         replayButton.disabled = false;
         clearAnswerButton.hidden = true;
         referencePatternButton.hidden = false;
+        referenceSpeedControl.hidden = false;
         nextButton.focus();
       }
 
@@ -1816,6 +1850,8 @@
         feedback.classList.remove('visible');
         game.classList.remove('is-playing');
         referencePatternButton.hidden = true;
+        referenceSpeedControl.hidden = true;
+        referenceSpeedInput.disabled = false;
         renderKeyboard();
       }
 
@@ -1992,6 +2028,12 @@
           masterGain.gain.setTargetAtTime(masterVolume, audioContext.currentTime, 0.015);
         }
         try { localStorage.setItem(VOLUME_STORAGE_KEY, String(masterVolume)); } catch (_) {}
+      });
+
+      referenceSpeedInput.addEventListener('input', () => {
+        referenceNoteSeconds = Number(referenceSpeedInput.value);
+        referenceSpeedValue.textContent = `${referenceNoteSeconds.toFixed(2)}秒`;
+        try { localStorage.setItem(REFERENCE_SPEED_STORAGE_KEY, String(referenceNoteSeconds)); } catch (_) {}
       });
 
       document.addEventListener('keydown', event => {
