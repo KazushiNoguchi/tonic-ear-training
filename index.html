@@ -307,6 +307,9 @@
 
     .stats-panel { width: 100%; }
     .analysis-content { margin: 26px 0 30px; text-align: left; }
+    .stats-mode-block + .stats-mode-block { margin-top: 38px; padding-top: 34px; border-top: 1px solid var(--ink); }
+    .stats-mode-title { margin: 0 0 18px; font-size: 18px; }
+    .stats-mode-body .analysis-content { margin: 0; }
     .analysis-overview { display: flex; justify-content: space-between; margin-bottom: 14px; font: 500 12px/1 "DM Mono", monospace; }
     .analysis-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .analysis-metric { padding: 13px 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.38); }
@@ -1028,11 +1031,10 @@
       volumeSlider.value = String(Math.round(masterVolume * 100));
       volumeValue.textContent = volumeSlider.value;
 
-      const STATS_STORAGE_KEY = 'tonic-ear-training-stats-v2';
+      const STATS_STORAGE_KEY = 'tonic-ear-training-stats-v3';
 
-      function emptyStats() {
+      function emptyModeStats() {
         return {
-          version: 2,
           total: 0,
           correct: 0,
           notes: Array.from({ length: 12 }, () => ({ total: 0, correct: 0 })),
@@ -1050,38 +1052,57 @@
         };
       }
 
+      function emptyStats() {
+        return {
+          version: 3,
+          modes: {
+            1: emptyModeStats(),
+            2: emptyModeStats(),
+            3: emptyModeStats()
+          }
+        };
+      }
+
+      function restoreModeStats(target, saved) {
+        if (!saved || !Array.isArray(saved.notes)) return;
+        target.total = Number(saved.total) || 0;
+        target.correct = Number(saved.correct) || 0;
+        target.notes.forEach((note, index) => {
+          note.total = Number(saved.notes[index]?.total) || 0;
+          note.correct = Number(saved.notes[index]?.correct) || 0;
+        });
+        target.confusion.forEach((row, targetInterval) => {
+          row.forEach((_, answerInterval) => {
+            row[answerInterval] = Number(saved.confusion?.[targetInterval]?.[answerInterval]) || 0;
+          });
+        });
+        target.keys.forEach((key, keyIndex) => {
+          key.forEach((note, interval) => {
+            note.total = Number(saved.keys?.[keyIndex]?.[interval]?.total) || 0;
+            note.correct = Number(saved.keys?.[keyIndex]?.[interval]?.correct) || 0;
+          });
+        });
+        Object.keys(target.questions).forEach(name => {
+          target.questions[name] = Number(saved.questions?.[name]) || 0;
+        });
+      }
+
       function loadStats() {
         const fallback = emptyStats();
         try {
           const saved = JSON.parse(localStorage.getItem(STATS_STORAGE_KEY));
-          if (!saved || saved.version !== 2 || !Array.isArray(saved.notes)) return fallback;
-          fallback.total = Number(saved.total) || 0;
-          fallback.correct = Number(saved.correct) || 0;
-          fallback.notes.forEach((note, index) => {
-            note.total = Number(saved.notes[index]?.total) || 0;
-            note.correct = Number(saved.notes[index]?.correct) || 0;
-          });
-          fallback.confusion.forEach((row, target) => {
-            row.forEach((_, answer) => {
-              row[answer] = Number(saved.confusion?.[target]?.[answer]) || 0;
-            });
-          });
-          fallback.keys.forEach((key, keyIndex) => {
-            key.forEach((note, interval) => {
-              note.total = Number(saved.keys?.[keyIndex]?.[interval]?.total) || 0;
-              note.correct = Number(saved.keys?.[keyIndex]?.[interval]?.correct) || 0;
-            });
-          });
-          Object.keys(fallback.questions).forEach(name => {
-            fallback.questions[name] = Number(saved.questions?.[name]) || 0;
-          });
+          if (!saved || saved.version !== 3 || !saved.modes) return fallback;
+          [1, 2, 3].forEach(length => restoreModeStats(fallback.modes[length], saved.modes[length]));
         } catch (_) {}
         return fallback;
       }
 
       let lifetimeStats = loadStats();
-      let sessionStats = emptyStats();
-      try { localStorage.removeItem('tonic-ear-training-stats-v1'); } catch (_) {}
+      let sessionStats = emptyModeStats();
+      try {
+        localStorage.removeItem('tonic-ear-training-stats-v1');
+        localStorage.removeItem('tonic-ear-training-stats-v2');
+      } catch (_) {}
 
       function saveStats() {
         try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(lifetimeStats)); } catch (_) {}
@@ -1101,7 +1122,7 @@
 
       function recordAnswer(targetInterval, answerInterval, isCorrect, keyIndex) {
         addAnswerToStats(sessionStats, targetInterval, answerInterval, isCorrect, keyIndex);
-        addAnswerToStats(lifetimeStats, targetInterval, answerInterval, isCorrect, keyIndex);
+        addAnswerToStats(lifetimeStats.modes[session.sequenceLength], targetInterval, answerInterval, isCorrect, keyIndex);
       }
 
       function addQuestionToStats(stats, isCorrect, playCount) {
@@ -1116,7 +1137,7 @@
 
       function recordQuestion(isCorrect, playCount) {
         addQuestionToStats(sessionStats, isCorrect, playCount);
-        addQuestionToStats(lifetimeStats, isCorrect, playCount);
+        addQuestionToStats(lifetimeStats.modes[session.sequenceLength], isCorrect, playCount);
         saveStats();
       }
 
@@ -1190,7 +1211,19 @@
       }
 
       function renderStats() {
-        renderAnalytics(lifetimeStats, lifetimeStatsContent, true);
+        lifetimeStatsContent.replaceChildren();
+        [1, 2, 3].forEach(length => {
+          const section = document.createElement('section');
+          section.className = 'stats-mode-block';
+          const title = document.createElement('h2');
+          title.className = 'stats-mode-title';
+          title.textContent = length === 1 ? '単音モード' : `${length}音モード`;
+          const body = document.createElement('div');
+          body.className = 'stats-mode-body';
+          section.append(title, body);
+          lifetimeStatsContent.appendChild(section);
+          renderAnalytics(lifetimeStats.modes[length], body, true);
+        });
       }
 
       function renderKeyboard() {
@@ -1759,7 +1792,7 @@
         score = 0;
         attempts = 0;
         streak = 0;
-        sessionStats = emptyStats();
+        sessionStats = emptyModeStats();
         state = 'idle';
         scoreNode.textContent = '0';
         attemptsNode.textContent = '0';
