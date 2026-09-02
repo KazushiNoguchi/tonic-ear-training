@@ -197,10 +197,13 @@
     .advanced-content { padding: 3px 16px 18px; }
     .advanced-content .setting-group:last-child { margin-bottom: 0; }
 
-    .advanced-toggle-list { display: grid; gap: 7px; }
+    .advanced-mode-options { display: grid; gap: 7px; }
     .advanced-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; font-size: 12px; }
     .advanced-toggle:has(input:checked) { border-color: var(--ink); background: var(--mint); }
     .advanced-toggle input { width: 17px; height: 17px; accent-color: var(--orange); }
+    .advanced-select-row { display: grid; grid-template-columns: 1fr minmax(120px, auto); align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
+    .advanced-select-row[hidden] { display: none; }
+    .advanced-select-row select { min-height: 32px; padding: 0 28px 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); font-size: 12px; }
 
     .exclude-grid {
       display: grid;
@@ -801,8 +804,9 @@
               <div class="advanced-content">
                 <fieldset class="setting-group">
                   <legend>出題モード</legend>
-                  <div class="advanced-toggle-list">
-                    <label class="advanced-toggle"><input type="checkbox" name="fixedKey" value="1"><span>調を固定する</span></label>
+                  <div class="advanced-mode-options">
+                    <label class="advanced-select-row"><span>同じ調を連続</span><select name="keyRepeatCount" id="keyRepeatCount"></select></label>
+                    <label class="advanced-select-row" id="fixedKeyChoiceRow" hidden><span>使用する調</span><select name="fixedKeyChoice" id="fixedKeyChoice"></select></label>
                     <label class="advanced-toggle"><input type="checkbox" name="preQuestionReference" value="1"><span>ド基準フレーズ前半を出題前に再生</span></label>
                   </div>
                 </fieldset>
@@ -985,6 +989,9 @@
       const rangeMaxInput = document.querySelector('#rangeMax');
       const rangeMinValue = document.querySelector('#rangeMinValue');
       const rangeMaxValue = document.querySelector('#rangeMaxValue');
+      const keyRepeatCountInput = document.querySelector('#keyRepeatCount');
+      const fixedKeyChoiceRow = document.querySelector('#fixedKeyChoiceRow');
+      const fixedKeyChoiceInput = document.querySelector('#fixedKeyChoice');
       const resultPanel = document.querySelector('#resultPanel');
       const statsPanel = document.querySelector('#statsPanel');
       const sessionStatsContent = document.querySelector('#sessionStatsContent');
@@ -1023,6 +1030,20 @@
       const sequenceSteps = [...document.querySelectorAll('.sequence-step')];
       const foundationStepLabel = document.querySelector('#foundationStepLabel');
 
+      function appendSelectOption(select, value, label) {
+        const option = document.createElement('option');
+        option.value = String(value);
+        option.textContent = label;
+        select.appendChild(option);
+      }
+
+      for (let count = 1; count <= 30; count += 1) {
+        appendSelectOption(keyRepeatCountInput, count, `${count}問`);
+      }
+      appendSelectOption(keyRepeatCountInput, 'all', 'ずっと');
+      appendSelectOption(fixedKeyChoiceInput, 'random', 'ランダム');
+      KEYS.forEach((key, index) => appendSelectOption(fixedKeyChoiceInput, index, key.name));
+
       let audioContext;
       let masterGain;
       let limiter;
@@ -1035,7 +1056,8 @@
       let playbackId = 0;
       let timers = [];
       let previousKeyIndex = null;
-      let fixedKeyIndex = null;
+      let currentKeyIndex = null;
+      let roundsOnCurrentKey = 0;
       let keyBag = [];
       let degreeHistory = [];
       let lastRoundCorrect = null;
@@ -1049,7 +1071,8 @@
         excludedIntervals: [],
         rangeMin: 36,
         rangeMax: 95,
-        fixedKey: false,
+        keyRepeatCount: 1,
+        fixedKeyIndex: null,
         preQuestionReference: false
       };
       let keyButtons = [];
@@ -1500,12 +1523,7 @@
         return result;
       }
 
-      function drawKeyIndex() {
-        if (session.fixedKey) {
-          if (fixedKeyIndex === null) fixedKeyIndex = randomIndex(KEYS.length);
-          previousKeyIndex = fixedKeyIndex;
-          return fixedKeyIndex;
-        }
+      function drawNewKeyIndex() {
         if (!keyBag.length) {
           keyBag = shuffled(Array.from({ length: KEYS.length }, (_, index) => index));
           if (keyBag[0] === previousKeyIndex && keyBag.length > 1) {
@@ -1516,6 +1534,24 @@
         const keyIndex = keyBag.shift();
         previousKeyIndex = keyIndex;
         return keyIndex;
+      }
+
+      function drawKeyIndex() {
+        if (currentKeyIndex === null) {
+          currentKeyIndex = session.keyRepeatCount === Infinity && Number.isInteger(session.fixedKeyIndex)
+            ? session.fixedKeyIndex
+            : drawNewKeyIndex();
+          previousKeyIndex = currentKeyIndex;
+          roundsOnCurrentKey = 1;
+          return currentKeyIndex;
+        }
+        if (roundsOnCurrentKey < session.keyRepeatCount) {
+          roundsOnCurrentKey += 1;
+          return currentKeyIndex;
+        }
+        currentKeyIndex = drawNewKeyIndex();
+        roundsOnCurrentKey = 1;
+        return currentKeyIndex;
       }
 
       function drawDegree(eligibleDegrees) {
@@ -1897,7 +1933,8 @@
         currentRound = null;
         lastRoundCorrect = null;
         previousKeyIndex = null;
-        fixedKeyIndex = null;
+        currentKeyIndex = null;
+        roundsOnCurrentKey = 0;
         keyBag = [];
         degreeHistory = [];
         roundNumber = 0;
@@ -2007,16 +2044,24 @@
         rangeMaxValue.textContent = midiToSampleName(maximum);
       }
 
+      function updateFixedKeyChoice() {
+        fixedKeyChoiceRow.hidden = keyRepeatCountInput.value !== 'all';
+      }
+
       noteModeInputs.forEach(input => input.addEventListener('change', updateExcludeOptions));
       rangeMinInput.addEventListener('input', () => updateRange('minimum'));
       rangeMaxInput.addEventListener('input', () => updateRange('maximum'));
+      keyRepeatCountInput.addEventListener('change', updateFixedKeyChoice);
       updateExcludeOptions();
       updateRange('minimum');
+      updateFixedKeyChoice();
 
       settingsForm.addEventListener('submit', async event => {
         event.preventDefault();
         const data = new FormData(settingsForm);
         const modeId = data.get('noteMode');
+        const keyRepeatValue = data.get('keyRepeatCount');
+        const fixedKeyChoice = data.get('fixedKeyChoice');
         const excludedIntervals = data.getAll('excludeNote').map(Number);
         const availableIntervals = MODES[modeId].intervals.filter(interval => !excludedIntervals.includes(interval));
         if (!availableIntervals.length) {
@@ -2032,7 +2077,10 @@
           excludedIntervals,
           rangeMin: Number(data.get('rangeMin')),
           rangeMax: Number(data.get('rangeMax')),
-          fixedKey: data.has('fixedKey'),
+          keyRepeatCount: keyRepeatValue === 'all' ? Infinity : Number(keyRepeatValue),
+          fixedKeyIndex: keyRepeatValue === 'all' && fixedKeyChoice !== 'random'
+            ? Number(fixedKeyChoice)
+            : null,
           preQuestionReference: data.has('preQuestionReference')
         };
         foundationStepLabel.textContent = session.preQuestionReference
