@@ -106,10 +106,14 @@
     select.appendChild(option);
   }
 
-  for (let count = 1; count <= 30; count += 1) {
-    appendSelectOption(keyRepeatCountInput, count, `${count}問`);
-  }
-  appendSelectOption(keyRepeatCountInput, 'all', 'ずっと');
+  [
+    [1, 'しない'],
+    ['all', 'ずっと'],
+    [2, '2'],
+    [3, '3'],
+    [5, '5'],
+    [10, '10']
+  ].forEach(([value, label]) => appendSelectOption(keyRepeatCountInput, value, label));
   appendSelectOption(fixedKeyChoiceInput, 'random', 'ランダム');
   KEYS.forEach((key, index) => appendSelectOption(fixedKeyChoiceInput, index, key.name));
 
