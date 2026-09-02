@@ -1085,8 +1085,11 @@
       const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
       let masterVolume = 0.3;
       try {
-        const savedVolume = Number(localStorage.getItem(VOLUME_STORAGE_KEY));
-        if (Number.isFinite(savedVolume) && savedVolume >= 0 && savedVolume <= 1) masterVolume = savedVolume;
+        const savedVolumeValue = localStorage.getItem(VOLUME_STORAGE_KEY);
+        if (savedVolumeValue !== null) {
+          const savedVolume = Number(savedVolumeValue);
+          if (Number.isFinite(savedVolume) && savedVolume >= 0 && savedVolume <= 1) masterVolume = savedVolume;
+        }
       } catch (_) {}
       volumeSlider.value = String(Math.round(masterVolume * 100));
       volumeValue.textContent = volumeSlider.value;
