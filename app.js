@@ -30,6 +30,7 @@
     sine: 'サイン波',
     sawtooth: '鋸状波'
   };
+  const PIANO_SAMPLE_RATE = 44100;
   const KEYS = [
     { midi: 48, name: 'Cメジャー' },
     { midi: 49, name: 'D♭メジャー' },
@@ -509,9 +510,21 @@
       : 'CLICK / TAP';
   }
 
+  function createAudioContext() {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    try {
+      return new AudioContextClass({
+        latencyHint: 'interactive',
+        sampleRate: PIANO_SAMPLE_RATE
+      });
+    } catch (_) {
+      return new AudioContextClass();
+    }
+  }
+
   function ensureAudio() {
     if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContext = createAudioContext();
       masterGain = audioContext.createGain();
       limiter = audioContext.createDynamicsCompressor();
       masterGain.gain.value = masterVolume;
@@ -545,6 +558,7 @@
   function preparePianoSamples() {
     if (pianoBuffers.size) return Promise.resolve();
     if (pianoLoadPromise) return pianoLoadPromise;
+    if (audioContext.sampleRate !== PIANO_SAMPLE_RATE) return Promise.resolve();
     const samples = window.MIDI?.Soundfont?.acoustic_grand_piano;
     if (!samples) return Promise.resolve();
 
