@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260902-3">
+  <link rel="stylesheet" href="styles.css?v=20260903-4">
 </head>
 <body>
   <div class="shell">
@@ -17,6 +17,10 @@
           <p class="brand-sub">相対音感トレーニング</p>
         </div>
       </div>
+      <nav class="training-menu" aria-label="トレーニングメニュー">
+        <button class="training-menu-button is-active" type="button" data-training-view="ear" aria-current="page">音感</button>
+        <button class="training-menu-button" type="button" data-training-view="melody">メロディー</button>
+      </nav>
       <div class="header-actions">
         <div class="header-help">イヤホン推奨 ・ 音量にご注意ください</div>
         <label class="volume-control" for="volumeSlider">
@@ -219,11 +223,71 @@
         </div>
       </section>
     </main>
+
+    <main class="melody-trainer" id="melodyTrainer" hidden>
+      <section class="melody-trainer-head">
+        <div>
+          <h1>メロディーを歌う</h1>
+        </div>
+        <div class="melody-options">
+          <fieldset class="melody-option-group">
+            <legend>音域</legend>
+            <div class="melody-radio-row melody-range-options">
+              <label><input type="radio" name="melodyRange" value="cgc2" checked><span>ド～ソ～ド（2セグ）</span></label>
+              <label><input type="radio" name="melodyRange" value="gcg2"><span>ソ～ド～ソ（2セグ）</span></label>
+              <label><input type="radio" name="melodyRange" value="cgcg3"><span>ド～ソ～ド～ソ（3セグ）</span></label>
+              <label><input type="radio" name="melodyRange" value="gcgc3"><span>ソ～ド～ソ～ド（3セグ）</span></label>
+            </div>
+          </fieldset>
+          <fieldset class="melody-option-group melody-loop-group">
+            <legend>ループ</legend>
+            <div class="melody-radio-row">
+              <label><input type="radio" name="melodyLoops" value="1" checked><span>1</span></label>
+              <label><input type="radio" name="melodyLoops" value="2"><span>2</span></label>
+              <label><input type="radio" name="melodyLoops" value="4"><span>4</span></label>
+            </div>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="melody-score" aria-labelledby="melodyScoreTitle">
+        <div class="melody-score-meta">
+          <div><span>KEY</span><strong id="melodyKey">C</strong></div>
+          <div><span>PROGRESSION</span><strong id="melodyProgressionName">—</strong></div>
+        </div>
+        <h2 class="sr-only" id="melodyScoreTitle">コードとメロディー</h2>
+        <div class="melody-timeline-scroll">
+          <div class="melody-timeline" id="melodyTimeline"></div>
+        </div>
+      </section>
+
+      <section class="melody-transport">
+        <div class="melody-buttons">
+          <button class="secondary" id="melodyChordsButton" type="button">コード進行</button>
+          <button class="secondary" id="melodyFirstNoteButton" type="button">最初の1音</button>
+          <button class="secondary" id="melodyReferenceButton" type="button">ド基準フレーズ</button>
+          <button class="primary" id="melodyAnswerButton" type="button">答え合わせ</button>
+          <button class="secondary melody-next-button" id="melodyNextButton" type="button">次へ →</button>
+        </div>
+        <div class="melody-speed-controls">
+          <label for="melodyChordSpeed">
+            <span>コード</span>
+            <input id="melodyChordSpeed" type="range" min="0.5" max="2" step="0.1" value="1">
+            <output id="melodyChordSpeedValue" for="melodyChordSpeed">1.0秒</output>
+          </label>
+          <label for="melodyReferenceSpeed">
+            <span>ド基準</span>
+            <input id="melodyReferenceSpeed" type="range" min="0.25" max="1" step="0.05" value="0.5">
+            <output id="melodyReferenceSpeedValue" for="melodyReferenceSpeed">0.50秒</output>
+          </label>
+        </div>
+      </section>
+    </main>
     <footer class="site-version">Version 1.0</footer>
     <p class="sr-only" id="liveRegion" aria-live="assertive"></p>
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260903-2"></script>
+  <script src="app.js?v=20260903-3"></script>
 </body>
 </html>
