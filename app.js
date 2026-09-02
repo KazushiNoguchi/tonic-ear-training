@@ -219,6 +219,9 @@
   const melodyKeyNode = document.querySelector('#melodyKey');
   const melodyProgressionName = document.querySelector('#melodyProgressionName');
   const melodyTimeline = document.querySelector('#melodyTimeline');
+  const melodyScore = document.querySelector('.melody-score');
+  const melodyVisualizer = document.querySelector('#melodyVisualizer');
+  const melodyVisualizerCanvas = document.querySelector('#melodyVisualizerCanvas');
   const melodyChordsButton = document.querySelector('#melodyChordsButton');
   const melodyFirstNoteButton = document.querySelector('#melodyFirstNoteButton');
   const melodyReferenceButton = document.querySelector('#melodyReferenceButton');
@@ -296,6 +299,8 @@
   let melodyLoops = 1;
   let melodyChordSeconds = 1;
   let melodyReferenceSeconds = 0.5;
+  let melodyAnimationFrame = null;
+  let melodyVisualizerState = null;
 
   const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
   let masterVolume = 0.3;
@@ -1190,6 +1195,202 @@
     melodyTimeline.querySelectorAll('.is-playing').forEach(cell => cell.classList.remove('is-playing'));
   }
 
+  function drawRoundedRect(context, x, y, width, height, radius) {
+    const safeRadius = Math.min(radius, width / 2, height / 2);
+    context.beginPath();
+    context.moveTo(x + safeRadius, y);
+    context.lineTo(x + width - safeRadius, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+    context.lineTo(x + width, y + height - safeRadius);
+    context.quadraticCurveTo(x + width, y + height, x + width - safeRadius, y + height);
+    context.lineTo(x + safeRadius, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+    context.lineTo(x, y + safeRadius);
+    context.quadraticCurveTo(x, y, x + safeRadius, y);
+    context.closePath();
+  }
+
+  function pianoRollKeyGeometry(width, keyboardTop, keyboardHeight) {
+    const minimumMidi = 36;
+    const maximumMidi = 84;
+    const blackPitchClasses = new Set([1, 3, 6, 8, 10]);
+    const whiteCount = Array.from({ length: maximumMidi - minimumMidi }, (_, index) => minimumMidi + index)
+      .filter(midi => !blackPitchClasses.has(pitchClass(midi))).length;
+    const whiteWidth = width / whiteCount;
+    const blackWidth = Math.max(4, whiteWidth * 0.62);
+    const keys = new Map();
+    let whiteIndex = 0;
+
+    for (let midi = minimumMidi; midi < maximumMidi; midi += 1) {
+      if (blackPitchClasses.has(pitchClass(midi))) {
+        keys.set(midi, {
+          x: whiteIndex * whiteWidth - blackWidth / 2,
+          width: blackWidth,
+          y: keyboardTop,
+          height: keyboardHeight * 0.62,
+          black: true
+        });
+      } else {
+        keys.set(midi, {
+          x: whiteIndex * whiteWidth,
+          width: whiteWidth,
+          y: keyboardTop,
+          height: keyboardHeight,
+          black: false
+        });
+        whiteIndex += 1;
+      }
+    }
+    return keys;
+  }
+
+  function resizeMelodyVisualizerCanvas() {
+    const width = melodyVisualizerCanvas.clientWidth;
+    const height = melodyVisualizerCanvas.clientHeight;
+    const scale = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelWidth = Math.round(width * scale);
+    const pixelHeight = Math.round(height * scale);
+    if (melodyVisualizerCanvas.width !== pixelWidth || melodyVisualizerCanvas.height !== pixelHeight) {
+      melodyVisualizerCanvas.width = pixelWidth;
+      melodyVisualizerCanvas.height = pixelHeight;
+    }
+    const context = melodyVisualizerCanvas.getContext('2d');
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    return { context, width, height };
+  }
+
+  function drawPianoRollFrame() {
+    if (!melodyVisualizerState || !audioContext) return;
+    const { context, width, height } = resizeMelodyVisualizerCanvas();
+    if (!width || !height) {
+      melodyAnimationFrame = window.requestAnimationFrame(drawPianoRollFrame);
+      return;
+    }
+
+    const now = audioContext.currentTime;
+    const keyboardHeight = Math.max(66, Math.min(82, height * 0.22));
+    const strikeY = height - keyboardHeight - 4;
+    const topPadding = 18;
+    const fallingHeight = strikeY - topPadding;
+    const pixelsPerSecond = fallingHeight / melodyVisualizerState.lookAhead;
+    const keys = pianoRollKeyGeometry(width, strikeY + 4, keyboardHeight);
+    const activeKeys = new Map();
+
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = '#11100f';
+    context.fillRect(0, 0, width, height);
+
+    keys.forEach(key => {
+      if (key.black) return;
+      context.strokeStyle = 'rgba(243, 239, 231, 0.07)';
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(key.x, 0);
+      context.lineTo(key.x, strikeY);
+      context.stroke();
+    });
+
+    melodyVisualizerState.chordStarts.forEach(start => {
+      const y = strikeY - (start - now) * pixelsPerSecond;
+      if (y < 0 || y > strikeY) return;
+      context.strokeStyle = 'rgba(243, 239, 231, 0.1)';
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+      context.stroke();
+    });
+
+    context.save();
+    context.beginPath();
+    context.rect(0, 0, width, strikeY);
+    context.clip();
+    melodyVisualizerState.events.forEach(event => {
+      const key = keys.get(event.midi);
+      if (!key) return;
+      const bottom = strikeY - (event.start - now) * pixelsPerSecond;
+      const barHeight = Math.max(12, (event.end - event.start) * pixelsPerSecond);
+      const top = bottom - barHeight;
+      if (bottom < -4 || top > strikeY + 4) return;
+      const inset = event.type === 'melody' ? 1 : Math.max(1, key.width * 0.12);
+      const x = key.x + inset;
+      const noteWidth = Math.max(3, key.width - inset * 2);
+      context.fillStyle = event.type === 'melody' ? '#f15a35' : '#a8d8c5';
+      context.shadowColor = event.type === 'melody' ? 'rgba(241, 90, 53, 0.5)' : 'rgba(168, 216, 197, 0.32)';
+      context.shadowBlur = event.type === 'melody' ? 10 : 5;
+      drawRoundedRect(context, x, top, noteWidth, barHeight, Math.min(5, noteWidth / 3));
+      context.fill();
+      context.shadowBlur = 0;
+      if (now >= event.start && now <= event.end) activeKeys.set(event.midi, event.type);
+    });
+    context.restore();
+
+    context.strokeStyle = 'rgba(241, 90, 53, 0.95)';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(0, strikeY + 1.5);
+    context.lineTo(width, strikeY + 1.5);
+    context.stroke();
+
+    keys.forEach((key, midi) => {
+      if (key.black) return;
+      context.fillStyle = activeKeys.has(midi)
+        ? (activeKeys.get(midi) === 'melody' ? '#f15a35' : '#a8d8c5')
+        : '#f3efe7';
+      context.fillRect(key.x, key.y, key.width, key.height);
+      context.strokeStyle = '#171614';
+      context.lineWidth = 1;
+      context.strokeRect(key.x, key.y, key.width, key.height);
+      if (pitchClass(midi) === 0) {
+        context.fillStyle = 'rgba(23, 22, 20, 0.55)';
+        context.font = '9px "DM Mono", monospace';
+        context.textAlign = 'center';
+        context.fillText(`C${Math.floor(midi / 12) - 1}`, key.x + key.width / 2, height - 8);
+      }
+    });
+
+    keys.forEach((key, midi) => {
+      if (!key.black) return;
+      context.fillStyle = activeKeys.has(midi)
+        ? (activeKeys.get(midi) === 'melody' ? '#f15a35' : '#77bca0')
+        : '#171614';
+      context.fillRect(key.x, key.y, key.width, key.height);
+      context.strokeStyle = '#11100f';
+      context.strokeRect(key.x, key.y, key.width, key.height);
+    });
+
+    context.textAlign = 'right';
+    context.font = '600 10px "Noto Sans JP", sans-serif';
+    const chordLegendRight = melodyVisualizerState.hasMelody ? width - 124 : width - 12;
+    context.fillStyle = '#a8d8c5';
+    context.fillRect(chordLegendRight - 64, 15, 9, 9);
+    context.fillStyle = 'rgba(243, 239, 231, 0.78)';
+    context.fillText('コード', chordLegendRight, 24);
+    if (melodyVisualizerState.hasMelody) {
+      context.fillStyle = '#f15a35';
+      context.fillRect(width - 112, 15, 9, 9);
+      context.fillStyle = 'rgba(243, 239, 231, 0.78)';
+      context.fillText('メロディー', width - 12, 24);
+    }
+
+    melodyAnimationFrame = window.requestAnimationFrame(drawPianoRollFrame);
+  }
+
+  function startMelodyVisualizer(events, chordStarts, lookAhead, hasMelody) {
+    if (melodyAnimationFrame !== null) window.cancelAnimationFrame(melodyAnimationFrame);
+    melodyVisualizerState = { events, chordStarts, lookAhead, hasMelody };
+    melodyScore.classList.add('is-visualizing');
+    melodyVisualizer.hidden = false;
+    melodyAnimationFrame = window.requestAnimationFrame(drawPianoRollFrame);
+  }
+
+  function stopMelodyVisualizer() {
+    if (melodyAnimationFrame !== null) window.cancelAnimationFrame(melodyAnimationFrame);
+    melodyAnimationFrame = null;
+    melodyVisualizerState = null;
+    melodyVisualizer.hidden = true;
+    melodyScore.classList.remove('is-visualizing');
+  }
+
   function restoreMelodyControls() {
     melodyPlaybackButtons.forEach(button => {
       button.disabled = false;
@@ -1203,6 +1404,7 @@
     melodyReferenceSpeed.disabled = false;
     activeMelodyButton = null;
     clearMelodyHighlights();
+    stopMelodyVisualizer();
   }
 
   function stopMelodyPlayback() {
@@ -1232,23 +1434,34 @@
   }
 
   function scheduleMelodyArrangement(start, includeMelody) {
-    let cursor = start;
+    const lookAhead = Math.min(2.2, Math.max(1.4, melodyChordSeconds * 1.35));
+    const events = [];
+    const chordStarts = [];
+    let cursor = start + lookAhead;
     melodyQuestion.harmony.forEach((chord, index) => {
       const chordDuration = melodyChordSeconds * (chord.length || 1);
-      highlightMelodyChord(index, cursor);
+      const chordToneDuration = Math.max(0.26, chordDuration * 0.92);
+      chordStarts.push(cursor);
       melodyQuestion.voicings[index].forEach(midi => {
-        scheduleTone(midi, cursor, Math.max(0.26, chordDuration * 0.92), 0.065, 'piano');
+        scheduleTone(midi, cursor, chordToneDuration, 0.065, 'piano');
+        events.push({ midi, start: cursor, end: cursor + chordToneDuration, type: 'chord' });
       });
       if (includeMelody) {
         const notes = melodyQuestion.melody[index];
-        scheduleTone(notes.head, cursor, Math.max(0.24, Math.min(0.7, chordDuration * 0.46)), 0.14, 'piano');
+        const headDuration = Math.max(0.24, Math.min(0.7, chordDuration * 0.46));
+        scheduleTone(notes.head, cursor, headDuration, 0.14, 'piano');
+        events.push({ midi: notes.head, start: cursor, end: cursor + headDuration, type: 'melody' });
         if (notes.middle !== null) {
-          scheduleTone(notes.middle, cursor + chordDuration / 2, Math.max(0.22, chordDuration * 0.42), 0.14, 'piano');
+          const middleStart = cursor + chordDuration / 2;
+          const middleDuration = Math.max(0.22, chordDuration * 0.42);
+          scheduleTone(notes.middle, middleStart, middleDuration, 0.14, 'piano');
+          events.push({ midi: notes.middle, start: middleStart, end: middleStart + middleDuration, type: 'melody' });
         }
       }
       cursor += chordDuration;
     });
-    return cursor;
+    startMelodyVisualizer(events, chordStarts, lookAhead + 0.45, includeMelody);
+    return cursor + 0.3;
   }
 
   function scheduleMelodyReference(start) {

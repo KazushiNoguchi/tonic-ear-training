@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-4">
+  <link rel="stylesheet" href="styles.css?v=20260903-5">
 </head>
 <body>
   <div class="shell">
@@ -259,6 +259,9 @@
         <div class="melody-timeline-scroll">
           <div class="melody-timeline" id="melodyTimeline"></div>
         </div>
+        <div class="melody-visualizer" id="melodyVisualizer" hidden>
+          <canvas id="melodyVisualizerCanvas" aria-label="再生中のピアノロール"></canvas>
+        </div>
       </section>
 
       <section class="melody-transport">
@@ -288,6 +291,6 @@
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260903-3"></script>
+  <script src="app.js?v=20260903-4"></script>
 </body>
 </html>
