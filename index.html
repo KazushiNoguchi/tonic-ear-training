@@ -197,6 +197,11 @@
     .advanced-content { padding: 3px 16px 18px; }
     .advanced-content .setting-group:last-child { margin-bottom: 0; }
 
+    .advanced-toggle-list { display: grid; gap: 7px; }
+    .advanced-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; cursor: pointer; font-size: 12px; }
+    .advanced-toggle:has(input:checked) { border-color: var(--ink); background: var(--mint); }
+    .advanced-toggle input { width: 17px; height: 17px; accent-color: var(--orange); }
+
     .exclude-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
@@ -795,6 +800,14 @@
               <summary>詳細オプション</summary>
               <div class="advanced-content">
                 <fieldset class="setting-group">
+                  <legend>出題モード</legend>
+                  <div class="advanced-toggle-list">
+                    <label class="advanced-toggle"><input type="checkbox" name="fixedKey" value="1"><span>調を固定する</span></label>
+                    <label class="advanced-toggle"><input type="checkbox" name="preQuestionReference" value="1"><span>ド基準フレーズ前半を出題前に再生</span></label>
+                  </div>
+                </fieldset>
+
+                <fieldset class="setting-group">
                   <legend>除外する音</legend>
                   <div class="exclude-grid">
                     <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude0" value="0"><label for="exclude0">ド</label></div>
@@ -889,7 +902,7 @@
         <aside class="sequence-panel" aria-label="再生シーケンス">
           <p class="sequence-title">LISTENING FLOW</p>
           <ol class="sequence-list">
-            <li class="sequence-step" data-sequence="0"><span class="step-number">01</span><span>I–IV–V–I</span></li>
+            <li class="sequence-step" data-sequence="0"><span class="step-number">01</span><span id="foundationStepLabel">I–IV–V–I</span></li>
             <li class="sequence-step" data-sequence="1"><span class="step-number">02</span><span>問題の音</span></li>
             <li class="sequence-step" data-sequence="2"><span class="step-number">03</span><span>鍵盤で回答</span></li>
           </ol>
@@ -1008,6 +1021,7 @@
       const accuracyNode = document.querySelector('#accuracy');
       const liveRegion = document.querySelector('#liveRegion');
       const sequenceSteps = [...document.querySelectorAll('.sequence-step')];
+      const foundationStepLabel = document.querySelector('#foundationStepLabel');
 
       let audioContext;
       let masterGain;
@@ -1021,6 +1035,7 @@
       let playbackId = 0;
       let timers = [];
       let previousKeyIndex = null;
+      let fixedKeyIndex = null;
       let keyBag = [];
       let degreeHistory = [];
       let lastRoundCorrect = null;
@@ -1033,7 +1048,9 @@
         timbre: 'piano',
         excludedIntervals: [],
         rangeMin: 36,
-        rangeMax: 95
+        rangeMax: 95,
+        fixedKey: false,
+        preQuestionReference: false
       };
       let keyButtons = [];
       let userAnswers = [];
@@ -1484,6 +1501,11 @@
       }
 
       function drawKeyIndex() {
+        if (session.fixedKey) {
+          if (fixedKeyIndex === null) fixedKeyIndex = randomIndex(KEYS.length);
+          previousKeyIndex = fixedKeyIndex;
+          return fixedKeyIndex;
+        }
         if (!keyBag.length) {
           keyBag = shuffled(Array.from({ length: KEYS.length }, (_, index) => index));
           if (keyBag[0] === previousKeyIndex && keyBag.length > 1) {
@@ -1576,13 +1598,20 @@
         referenceSpeedInput.disabled = false;
         game.classList.add('is-playing');
         state = 'playing';
-        phaseText.textContent = '基準コードを再生中';
-        headline.textContent = 'I–IV–V–I';
+        const includePrelude = session.preQuestionReference && !reviewMode;
+        phaseText.textContent = includePrelude ? 'ド基準フレーズ' : '基準コードを再生中';
+        headline.textContent = includePrelude ? 'ド基準フレーズ' : 'I–IV–V–I';
         statusCopy.textContent = '';
         setSequence(0);
 
         const now = audioContext.currentTime + 0.08;
         const tonic = currentRound.key.midi;
+        let chordStart = now;
+        if (includePrelude) {
+          const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
+          chordStart = scheduleReferenceSequence(buildReferenceFirstHalf(lowTonic), now) + referenceNoteSeconds * 0.7;
+        }
+        const preludeDelay = chordStart - now;
         const chords = [
           chord(tonic),
           chord(tonic + 5),
@@ -1591,21 +1620,29 @@
         ];
 
         chords.forEach((notes, chordIndex) => {
-          notes.forEach(note => scheduleTone(note, now + chordIndex * 0.5, 0.48, 0.115));
+          notes.forEach(note => scheduleTone(note, chordStart + chordIndex * 0.5, 0.48, 0.115));
         });
+        const targetStart = chordStart + 2.5;
         currentRound.targetMidis.forEach((midi, index) => {
-          scheduleTone(midi, now + 2.5 + index * 0.5, 0.48, 0.24);
+          scheduleTone(midi, targetStart + index * 0.5, 0.48, 0.24);
         });
 
         const idAtStart = playbackId;
-        scheduleUi(2.55, () => {
+        if (includePrelude) {
+          scheduleUi(chordStart - audioContext.currentTime, () => {
+            if (idAtStart !== playbackId) return;
+            phaseText.textContent = '基準コードを再生中';
+            headline.textContent = 'I–IV–V–I';
+          });
+        }
+        scheduleUi(preludeDelay + 2.55, () => {
           if (idAtStart !== playbackId) return;
           phaseText.textContent = '問題の音';
           headline.textContent = '問題の音';
           statusCopy.textContent = '';
           setSequence(1, 0);
         });
-        const answerReadyDelay = 2.5 + session.sequenceLength * 0.5 + 0.25;
+        const answerReadyDelay = preludeDelay + 2.5 + session.sequenceLength * 0.5 + 0.25;
         scheduleUi(answerReadyDelay, () => {
           if (idAtStart !== playbackId) return;
           if (reviewMode) {
@@ -1688,6 +1725,20 @@
         });
       }
 
+      function buildReferenceFirstHalf(lowTonic) {
+        const sequence = [lowTonic];
+        MAJOR_STEPS.slice(1).forEach(step => sequence.push(lowTonic + step, lowTonic));
+        sequence.push(lowTonic + 12);
+        return sequence;
+      }
+
+      function buildReferenceSecondHalf(lowTonic) {
+        const highTonic = lowTonic + 12;
+        const sequence = [highTonic];
+        MAJOR_STEPS.forEach(step => sequence.push(lowTonic + step, highTonic));
+        return sequence;
+      }
+
       function scheduleReferenceSequence(midis, start) {
         const step = referenceNoteSeconds;
         midis.forEach((midi, index) => {
@@ -1731,13 +1782,8 @@
         referenceSpeedInput.disabled = true;
 
         const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
-        const highTonic = lowTonic + 12;
-        const firstSequence = [lowTonic];
-        MAJOR_STEPS.slice(1).forEach(step => firstSequence.push(lowTonic + step, lowTonic));
-        firstSequence.push(highTonic);
-
-        const secondSequence = [highTonic];
-        MAJOR_STEPS.forEach(step => secondSequence.push(lowTonic + step, highTonic));
+        const firstSequence = buildReferenceFirstHalf(lowTonic);
+        const secondSequence = buildReferenceSecondHalf(lowTonic);
 
         const now = audioContext.currentTime + 0.03;
         const firstEnd = scheduleReferenceSequence(firstSequence, now);
@@ -1850,6 +1896,8 @@
         clearPlayback();
         currentRound = null;
         lastRoundCorrect = null;
+        previousKeyIndex = null;
+        fixedKeyIndex = null;
         keyBag = [];
         degreeHistory = [];
         roundNumber = 0;
@@ -1983,8 +2031,13 @@
           timbre: data.get('timbre'),
           excludedIntervals,
           rangeMin: Number(data.get('rangeMin')),
-          rangeMax: Number(data.get('rangeMax'))
+          rangeMax: Number(data.get('rangeMax')),
+          fixedKey: data.has('fixedKey'),
+          preQuestionReference: data.has('preQuestionReference')
         };
+        foundationStepLabel.textContent = session.preQuestionReference
+          ? 'ド基準フレーズ → I–IV–V–I'
+          : 'I–IV–V–I';
         ensureAudio();
         if (session.timbre === 'piano') {
           setupSubmitButton.disabled = true;
