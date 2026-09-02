@@ -1572,9 +1572,14 @@
         };
       }
 
-      function chord(rootMidi, quality = 'major') {
-        const intervals = quality === 'major' ? [0, 4, 7] : [0, 3, 7];
-        return [rootMidi - 12, ...intervals.map(interval => rootMidi + interval)];
+      function cadenceChords(tonic) {
+        const tonicVoicing = [tonic - 12, tonic, tonic + 4, tonic + 7];
+        return [
+          tonicVoicing,
+          [tonic - 7, tonic, tonic + 5, tonic + 9],
+          [tonic - 5, tonic + 2, tonic + 7, tonic + 11],
+          tonicVoicing
+        ];
       }
 
       function playRound(reviewMode = false) {
@@ -1612,12 +1617,7 @@
           chordStart = scheduleReferenceSequence(buildReferenceFirstHalf(lowTonic), now) + referenceNoteSeconds * 0.7;
         }
         const preludeDelay = chordStart - now;
-        const chords = [
-          chord(tonic),
-          chord(tonic + 5),
-          chord(tonic + 7),
-          chord(tonic)
-        ];
+        const chords = cadenceChords(tonic);
 
         chords.forEach((notes, chordIndex) => {
           notes.forEach(note => scheduleTone(note, chordStart + chordIndex * 0.5, 0.48, 0.115));
