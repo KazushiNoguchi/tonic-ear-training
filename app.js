@@ -72,41 +72,44 @@
     },
     marusa: {
       label: '丸サ進行',
-      roman: 'IVM7 | III7 | VIm7 | Vm7 I7',
+      roman: 'IVM7 | III7 | VIm7 | Vm7 I7 | IVM7',
       stepSeconds: 0.68,
       chords: [
         { root: 5, quality: 'major7' },
         { root: 4, quality: 'dominant7' },
         { root: 9, quality: 'minor7' },
         { root: 7, quality: 'minor7', length: 0.5 },
-        { root: 0, quality: 'dominant7', length: 0.5 }
+        { root: 0, quality: 'dominant7', length: 0.5 },
+        { root: 5, quality: 'major7' }
       ]
     },
     royalRoad: {
       label: '王道進行',
-      roman: 'IVM7 | V7 | IIIm7 | VIm7',
+      roman: 'IVM7 | V7 | IIIm7 | VIm7 | IVM7',
       stepSeconds: 0.68,
       chords: [
         { root: 5, quality: 'major7' },
         { root: 7, quality: 'dominant7' },
         { root: 4, quality: 'minor7' },
-        { root: 9, quality: 'minor7' }
+        { root: 9, quality: 'minor7' },
+        { root: 5, quality: 'major7' }
       ]
     },
     komuro: {
       label: '小室進行',
-      roman: 'VIm | IV | V | I',
+      roman: 'VIm | IV | V | I | VIm',
       stepSeconds: 0.68,
       chords: [
         { root: 9, quality: 'minor' },
         { root: 5, quality: 'major' },
         { root: 7, quality: 'major' },
-        { root: 0, quality: 'major' }
+        { root: 0, quality: 'major' },
+        { root: 9, quality: 'minor' }
       ]
     },
     canon: {
       label: 'カノン進行',
-      roman: 'I | V | VIm | IIIm | IV | I | IV | V',
+      roman: 'I | V | VIm | IIIm | IV | I | IV | V | I',
       stepSeconds: 0.46,
       chords: [
         { root: 0, quality: 'major' },
@@ -116,29 +119,32 @@
         { root: 5, quality: 'major' },
         { root: 0, quality: 'major' },
         { root: 5, quality: 'major' },
-        { root: 7, quality: 'major' }
+        { root: 7, quality: 'major' },
+        { root: 0, quality: 'major' }
       ]
     },
     pop: {
       label: 'ポップ定番進行',
-      roman: 'I | V | VIm | IV',
+      roman: 'I | V | VIm | IV | I',
       stepSeconds: 0.68,
       chords: [
         { root: 0, quality: 'major' },
         { root: 7, quality: 'major' },
         { root: 9, quality: 'minor' },
-        { root: 5, quality: 'major' }
+        { root: 5, quality: 'major' },
+        { root: 0, quality: 'major' }
       ]
     },
     circle: {
       label: '循環進行',
-      roman: 'IM7 | VI7 | IIm7 | V7',
+      roman: 'IM7 | VI7 | IIm7 | V7 | IM7',
       stepSeconds: 0.68,
       chords: [
         { root: 0, quality: 'major7' },
         { root: 9, quality: 'dominant7' },
         { root: 2, quality: 'minor7' },
-        { root: 7, quality: 'dominant7' }
+        { root: 7, quality: 'dominant7' },
+        { root: 0, quality: 'major7' }
       ]
     }
   };
