@@ -196,6 +196,8 @@ main {
 .advanced-select-row { display: grid; grid-template-columns: 1fr minmax(120px, auto); align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
 .advanced-select-row[hidden] { display: none; }
 .advanced-select-row select { min-height: 32px; padding: 0 28px 0 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--paper); color: var(--ink); font-size: 12px; }
+.progression-select-row { grid-template-columns: 46px minmax(0, 1fr); }
+.progression-select-row select { width: 100%; min-width: 0; }
 
 .exclude-grid {
   display: grid;

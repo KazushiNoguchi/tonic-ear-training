@@ -44,6 +44,103 @@
     { midi: 58, name: 'B♭メジャー' },
     { midi: 59, name: 'Bメジャー' }
   ];
+  const CHORD_QUALITIES = {
+    major: [0, 4, 7],
+    minor: [0, 3, 7],
+    major7: [0, 4, 7, 11],
+    minor7: [0, 3, 7, 10],
+    dominant7: [0, 4, 7, 10]
+  };
+  const CHORD_PROGRESSIONS = {
+    basic: {
+      label: '基本進行',
+      roman: 'I | IV | V | I',
+      stepSeconds: 0.5,
+      chords: [
+        { root: 0, quality: 'major' },
+        { root: 5, quality: 'major' },
+        { root: 7, quality: 'major' },
+        { root: 0, quality: 'major' }
+      ],
+      fixedVoicings: [
+        [-12, 0, 4, 7],
+        [-7, 0, 5, 9],
+        [-5, 2, 7, 11],
+        [-12, 0, 4, 7]
+      ]
+    },
+    marusa: {
+      label: '丸サ進行',
+      roman: 'IVM7 | III7 | VIm7 | Vm7 I7',
+      stepSeconds: 0.68,
+      chords: [
+        { root: 5, quality: 'major7' },
+        { root: 4, quality: 'dominant7' },
+        { root: 9, quality: 'minor7' },
+        { root: 7, quality: 'minor7', length: 0.5 },
+        { root: 0, quality: 'dominant7', length: 0.5 }
+      ]
+    },
+    royalRoad: {
+      label: '王道進行',
+      roman: 'IVM7 | V7 | IIIm7 | VIm7',
+      stepSeconds: 0.68,
+      chords: [
+        { root: 5, quality: 'major7' },
+        { root: 7, quality: 'dominant7' },
+        { root: 4, quality: 'minor7' },
+        { root: 9, quality: 'minor7' }
+      ]
+    },
+    komuro: {
+      label: '小室進行',
+      roman: 'VIm | IV | V | I',
+      stepSeconds: 0.68,
+      chords: [
+        { root: 9, quality: 'minor' },
+        { root: 5, quality: 'major' },
+        { root: 7, quality: 'major' },
+        { root: 0, quality: 'major' }
+      ]
+    },
+    canon: {
+      label: 'カノン進行',
+      roman: 'I | V | VIm | IIIm | IV | I | IV | V',
+      stepSeconds: 0.46,
+      chords: [
+        { root: 0, quality: 'major' },
+        { root: 7, quality: 'major' },
+        { root: 9, quality: 'minor' },
+        { root: 4, quality: 'minor' },
+        { root: 5, quality: 'major' },
+        { root: 0, quality: 'major' },
+        { root: 5, quality: 'major' },
+        { root: 7, quality: 'major' }
+      ]
+    },
+    pop: {
+      label: 'ポップ定番進行',
+      roman: 'I | V | VIm | IV',
+      stepSeconds: 0.68,
+      chords: [
+        { root: 0, quality: 'major' },
+        { root: 7, quality: 'major' },
+        { root: 9, quality: 'minor' },
+        { root: 5, quality: 'major' }
+      ]
+    },
+    circle: {
+      label: '循環進行',
+      roman: 'IM7 | VI7 | IIm7 | V7',
+      stepSeconds: 0.68,
+      chords: [
+        { root: 0, quality: 'major7' },
+        { root: 9, quality: 'dominant7' },
+        { root: 2, quality: 'minor7' },
+        { root: 7, quality: 'dominant7' }
+      ]
+    }
+  };
 
   const game = document.querySelector('#game');
   const volumeSlider = document.querySelector('#volumeSlider');
@@ -61,6 +158,7 @@
   const keyRepeatCountInput = document.querySelector('#keyRepeatCount');
   const fixedKeyChoiceRow = document.querySelector('#fixedKeyChoiceRow');
   const fixedKeyChoiceInput = document.querySelector('#fixedKeyChoice');
+  const chordProgressionInput = document.querySelector('#chordProgression');
   const resultPanel = document.querySelector('#resultPanel');
   const statsPanel = document.querySelector('#statsPanel');
   const sessionStatsContent = document.querySelector('#sessionStatsContent');
@@ -116,6 +214,9 @@
   ].forEach(([value, label]) => appendSelectOption(keyRepeatCountInput, value, label));
   appendSelectOption(fixedKeyChoiceInput, 'random', 'ランダム');
   KEYS.forEach((key, index) => appendSelectOption(fixedKeyChoiceInput, index, key.name));
+  Object.entries(CHORD_PROGRESSIONS).forEach(([id, progression]) => {
+    appendSelectOption(chordProgressionInput, id, `${progression.label}｜${progression.roman}`);
+  });
 
   let audioContext;
   let masterGain;
@@ -146,7 +247,9 @@
     rangeMax: 95,
     keyRepeatCount: 1,
     fixedKeyIndex: null,
-    preQuestionReference: false
+    preQuestionReference: false,
+    progressionId: 'basic',
+    progression: CHORD_PROGRESSIONS.basic
   };
   let keyButtons = [];
   let userAnswers = [];
@@ -684,14 +787,89 @@
     };
   }
 
-  function cadenceChords(tonic) {
-    const tonicVoicing = [tonic - 12, tonic, tonic + 4, tonic + 7];
-    return [
-      tonicVoicing,
-      [tonic - 7, tonic, tonic + 5, tonic + 9],
-      [tonic - 5, tonic + 2, tonic + 7, tonic + 11],
-      tonicVoicing
-    ];
+  function pitchesForClass(pitchClass, minimum, maximum) {
+    const pitches = [];
+    for (let midi = minimum; midi <= maximum; midi += 1) {
+      if ((midi % 12 + 12) % 12 === pitchClass) pitches.push(midi);
+    }
+    return pitches;
+  }
+
+  function chordVoicingCandidates(tonic, chord) {
+    const intervals = CHORD_QUALITIES[chord.quality];
+    const rootPitchClass = (tonic + chord.root) % 12;
+    const bassCandidates = pitchesForClass(rootPitchClass, 36, 52);
+    const upperIntervals = intervals.length === 3 ? intervals : intervals.slice(1);
+    const upperChoices = upperIntervals.map(interval =>
+      pitchesForClass((rootPitchClass + interval) % 12, 48, 79)
+    );
+    const candidates = new Map();
+
+    upperChoices[0].forEach(first => {
+      upperChoices[1].forEach(second => {
+        upperChoices[2].forEach(third => {
+          const upper = [first, second, third].sort((a, b) => a - b);
+          if (new Set(upper).size !== 3 || upper[2] - upper[0] > 17) return;
+          bassCandidates.forEach(bass => {
+            if (upper[0] - bass < 5) return;
+            const voicing = [bass, ...upper];
+            candidates.set(voicing.join(','), voicing);
+          });
+        });
+      });
+    });
+    return [...candidates.values()];
+  }
+
+  function voicingTransitionCost(previous, current) {
+    return current.reduce((cost, note, voiceIndex) => {
+      const movement = Math.abs(note - previous[voiceIndex]);
+      const leapPenalty = movement > 7 ? (movement - 7) * 1.8 : 0;
+      return cost + movement * (voiceIndex === 0 ? 0.55 : 1) + leapPenalty;
+    }, 0);
+  }
+
+  function smoothProgressionVoicings(tonic, progression) {
+    if (progression.fixedVoicings) {
+      return progression.fixedVoicings.map(voicing => voicing.map(offset => tonic + offset));
+    }
+    const anchor = [tonic - 12, tonic, tonic + 4, tonic + 7];
+    let states = chordVoicingCandidates(tonic, progression.chords[0]).map(voicing => ({
+      voicing,
+      cost: voicingTransitionCost(anchor, voicing),
+      path: [voicing]
+    }));
+
+    progression.chords.slice(1).forEach(chord => {
+      const candidates = chordVoicingCandidates(tonic, chord);
+      states = candidates.map(voicing => {
+        let bestPrevious = states[0];
+        let bestCost = Infinity;
+        states.forEach(previous => {
+          const cost = previous.cost + voicingTransitionCost(previous.voicing, voicing);
+          if (cost < bestCost) {
+            bestCost = cost;
+            bestPrevious = previous;
+          }
+        });
+        return { voicing, cost: bestCost, path: [...bestPrevious.path, voicing] };
+      });
+    });
+
+    return states.reduce((best, candidate) => candidate.cost < best.cost ? candidate : best).path;
+  }
+
+  function scheduleChordProgression(tonic, progression, start) {
+    const voicings = smoothProgressionVoicings(tonic, progression);
+    let cursor = start;
+    progression.chords.forEach((chord, chordIndex) => {
+      const chordSeconds = progression.stepSeconds * (chord.length || 1);
+      voicings[chordIndex].forEach(note => {
+        scheduleTone(note, cursor, Math.max(0.28, chordSeconds * 0.92), 0.105);
+      });
+      cursor += chordSeconds;
+    });
+    return cursor;
   }
 
   function playRound(reviewMode = false) {
@@ -717,7 +895,7 @@
     state = 'playing';
     const includePrelude = session.preQuestionReference && !reviewMode;
     phaseText.textContent = includePrelude ? 'ド基準フレーズ' : '基準コードを再生中';
-    headline.textContent = includePrelude ? 'ド基準フレーズ' : 'I–IV–V–I';
+    headline.textContent = includePrelude ? 'ド基準フレーズ' : session.progression.roman;
     statusCopy.textContent = '';
     setSequence(0);
 
@@ -728,13 +906,7 @@
       const lowTonic = currentRound.targetMidis[0] - currentRound.intervals[0];
       chordStart = scheduleReferenceSequence(buildReferenceFirstHalf(lowTonic), now) + referenceNoteSeconds * 0.7;
     }
-    const preludeDelay = chordStart - now;
-    const chords = cadenceChords(tonic);
-
-    chords.forEach((notes, chordIndex) => {
-      notes.forEach(note => scheduleTone(note, chordStart + chordIndex * 0.5, 0.48, 0.115));
-    });
-    const targetStart = chordStart + 2.5;
+    const targetStart = scheduleChordProgression(tonic, session.progression, chordStart) + 0.5;
     currentRound.targetMidis.forEach((midi, index) => {
       scheduleTone(midi, targetStart + index * 0.5, 0.48, 0.24);
     });
@@ -744,17 +916,17 @@
       scheduleUi(chordStart - audioContext.currentTime, () => {
         if (idAtStart !== playbackId) return;
         phaseText.textContent = '基準コードを再生中';
-        headline.textContent = 'I–IV–V–I';
+        headline.textContent = session.progression.roman;
       });
     }
-    scheduleUi(preludeDelay + 2.55, () => {
+    scheduleUi(targetStart - audioContext.currentTime, () => {
       if (idAtStart !== playbackId) return;
       phaseText.textContent = '問題の音';
       headline.textContent = '問題の音';
       statusCopy.textContent = '';
       setSequence(1, 0);
     });
-    const answerReadyDelay = preludeDelay + 2.5 + session.sequenceLength * 0.5 + 0.25;
+    const answerReadyDelay = targetStart - audioContext.currentTime + session.sequenceLength * 0.5 + 0.25;
     scheduleUi(answerReadyDelay, () => {
       if (idAtStart !== playbackId) return;
       if (reviewMode) {
@@ -1052,7 +1224,7 @@
     const percentage = Math.round((score / session.total) * 100);
     resultScore.textContent = percentage;
     const exclusionSetting = session.excludedIntervals.length ? ` · ${session.excludedIntervals.length}音除外` : '';
-    resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音 · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
+    resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音 · ${session.progression.label} · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
     renderAnalytics(sessionStats, sessionStatsContent);
     setupNumber.textContent = 'RESULT';
     setupTitle.textContent = '結果';
@@ -1138,6 +1310,7 @@
     const modeId = data.get('noteMode');
     const keyRepeatValue = data.get('keyRepeatCount');
     const fixedKeyChoice = data.get('fixedKeyChoice');
+    const progressionId = data.get('chordProgression');
     const excludedIntervals = data.getAll('excludeNote').map(Number);
     const availableIntervals = MODES[modeId].intervals.filter(interval => !excludedIntervals.includes(interval));
     if (!availableIntervals.length) {
@@ -1157,11 +1330,13 @@
       fixedKeyIndex: keyRepeatValue === 'all' && fixedKeyChoice !== 'random'
         ? Number(fixedKeyChoice)
         : null,
-      preQuestionReference: data.has('preQuestionReference')
+      preQuestionReference: data.has('preQuestionReference'),
+      progressionId,
+      progression: CHORD_PROGRESSIONS[progressionId] || CHORD_PROGRESSIONS.basic
     };
     foundationStepLabel.textContent = session.preQuestionReference
-      ? 'ド基準フレーズ → I–IV–V–I'
-      : 'I–IV–V–I';
+      ? `ド基準 → ${session.progression.label}`
+      : session.progression.label;
     ensureAudio();
     if (session.timbre === 'piano') {
       setupSubmitButton.disabled = true;
