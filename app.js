@@ -148,6 +148,8 @@
       ]
     }
   };
+  const MELODY_PROGRESSION_ENTRIES = Object.entries(CHORD_PROGRESSIONS)
+    .filter(([id]) => id !== 'basic');
 
   const NOTE_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
   const CHROMATIC_SOLFEGE = ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'];
@@ -231,6 +233,8 @@
   const melodyChordSpeedValue = document.querySelector('#melodyChordSpeedValue');
   const melodyReferenceSpeed = document.querySelector('#melodyReferenceSpeed');
   const melodyReferenceSpeedValue = document.querySelector('#melodyReferenceSpeedValue');
+  const melodyProgressionSelect = document.querySelector('#melodyProgressionSelect');
+  const melodyKeySelect = document.querySelector('#melodyKeySelect');
   const melodyPlaybackButtons = [melodyChordsButton, melodyFirstNoteButton, melodyReferenceButton, melodyAnswerButton];
 
   function appendSelectOption(select, value, label) {
@@ -253,6 +257,12 @@
   Object.entries(CHORD_PROGRESSIONS).forEach(([id, progression]) => {
     appendSelectOption(chordProgressionInput, id, `${progression.label}｜${progression.roman}`);
   });
+  appendSelectOption(melodyProgressionSelect, 'random', 'ランダム');
+  MELODY_PROGRESSION_ENTRIES.forEach(([id, progression]) => {
+    appendSelectOption(melodyProgressionSelect, id, `${progression.label}｜${progression.roman}`);
+  });
+  appendSelectOption(melodyKeySelect, 'random', 'ランダム');
+  KEYS.forEach((key, index) => appendSelectOption(melodyKeySelect, index, key.name));
 
   let audioContext;
   let masterGain;
@@ -299,6 +309,8 @@
   let melodyLoops = 1;
   let melodyChordSeconds = 1;
   let melodyReferenceSeconds = 0.5;
+  let fixedMelodyProgressionId = 'random';
+  let fixedMelodyKeyIndex = null;
   let melodyAnimationFrame = null;
   let melodyVisualizerState = null;
 
@@ -782,6 +794,10 @@
     return CHORD_QUALITIES[chord.quality].map(interval => pitchClass(root + interval));
   }
 
+  function isMajorScaleTone(tonic, midi) {
+    return MAJOR_STEPS.includes(pitchClass(midi - tonic));
+  }
+
   function melodyRange(tonic) {
     const range = MELODY_RANGES[melodyRangeId] || MELODY_RANGES.cgc2;
     return { minimum: tonic + range.minimum, maximum: tonic + range.maximum };
@@ -833,7 +849,7 @@
     return weightedChoice(choices);
   }
 
-  function chooseMiddleNote(tonic, chord, range, currentHead, nextHead) {
+  function chooseMiddleNote(tonic, chord, range, currentHead, nextHead, approachChromaticNext = false) {
     const chordTones = chordPitchClasses(tonic, chord);
     const scaleTones = MAJOR_STEPS.map(interval => pitchClass(tonic + interval));
     const possiblePitchClasses = [...new Set([...chordTones, ...scaleTones])];
@@ -849,6 +865,8 @@
           });
         return isChordTone || isAdjacentScaleTone;
       })
+      .filter(midi => isMajorScaleTone(tonic, midi) || Math.abs(midi - currentHead) === 1)
+      .filter(midi => !approachChromaticNext || Math.abs(midi - nextHead) === 1)
       .filter(midi => {
         const semitoneAboveChord = isSemitoneAboveAnotherChordTone(midi, chordTones);
         return !semitoneAboveChord || midi - nextHead === 1;
@@ -890,10 +908,21 @@
         );
         if (nextHead === null) break;
         if ((currentChord.length || 1) === 0.5) {
+          if (!isMajorScaleTone(tonic, nextHead) && Math.abs(nextHead - heads[index]) !== 1) {
+            excludedNextHeads.add(nextHead);
+            continue;
+          }
           found = true;
           break;
         }
-        middle = chooseMiddleNote(tonic, currentChord, range, heads[index], nextHead);
+        middle = chooseMiddleNote(
+          tonic,
+          currentChord,
+          range,
+          heads[index],
+          nextHead,
+          !isMajorScaleTone(tonic, nextHead)
+        );
         if (middle !== null) {
           found = true;
           break;
@@ -965,6 +994,7 @@
     melodyKeyNode.textContent = NOTE_NAMES[pitchClass(melodyQuestion.tonic)];
     melodyProgressionName.textContent = melodyQuestion.progression.label;
     melodyTimeline.replaceChildren();
+    melodyTimeline.parentElement.scrollLeft = 0;
 
     melodyQuestion.harmony.forEach((chord, index) => {
       const cell = document.createElement('article');
@@ -994,22 +1024,50 @@
   }
 
   function generateMelodyQuestion() {
-    const progressionEntries = Object.entries(CHORD_PROGRESSIONS);
-    const [progressionId, progression] = progressionEntries[randomIndex(progressionEntries.length)];
-    const key = KEYS[randomIndex(KEYS.length)];
+    const [progressionId, progression] = fixedMelodyProgressionId === 'random'
+      ? MELODY_PROGRESSION_ENTRIES[randomIndex(MELODY_PROGRESSION_ENTRIES.length)]
+      : [fixedMelodyProgressionId, CHORD_PROGRESSIONS[fixedMelodyProgressionId]];
+    const keyIndex = fixedMelodyKeyIndex === null ? randomIndex(KEYS.length) : fixedMelodyKeyIndex;
+    const key = KEYS[keyIndex];
+    const firstChord = progression.chords[0];
+    const lastChord = progression.chords[progression.chords.length - 1];
+    const hasAddedEnding = progression.chords.length > 1
+      && firstChord.root === lastChord.root
+      && firstChord.quality === lastChord.quality;
+    const loopBody = hasAddedEnding ? progression.chords.slice(0, -1) : progression.chords;
     const harmony = [];
     for (let loopIndex = 0; loopIndex < melodyLoops; loopIndex += 1) {
-      progression.chords.forEach((chord, sourceIndex) => {
+      loopBody.forEach((chord, sourceIndex) => {
         harmony.push({ ...chord, sourceIndex, loopIndex });
       });
     }
-    const melody = generateRuleBasedMelody(key.midi, harmony);
+    if (hasAddedEnding) {
+      harmony.push({
+        ...lastChord,
+        sourceIndex: progression.chords.length - 1,
+        loopIndex: melodyLoops
+      });
+    }
+    let melody = generateRuleBasedMelody(key.midi, harmony);
     if (!melody) {
       window.setTimeout(generateMelodyQuestion, 0);
       return;
     }
-    const baseVoicings = smoothProgressionVoicings(key.midi, progression);
-    const voicings = Array.from({ length: melodyLoops }, () => baseVoicings).flat();
+    const voicings = progression.fixedVoicings
+      ? harmony.map(chord => progression.fixedVoicings[chord.sourceIndex].map(offset => key.midi + offset))
+      : smoothProgressionVoicings(key.midi, { chords: harmony });
+    const melodyIsCloseToBass = melody.some((notes, index) => {
+      const bass = voicings[index][0];
+      return [notes.head, notes.middle]
+        .filter(midi => midi !== null)
+        .some(midi => midi - bass <= 12);
+    });
+    if (melodyIsCloseToBass) {
+      melody = melody.map(notes => ({
+        head: notes.head + 12,
+        middle: notes.middle === null ? null : notes.middle + 12
+      }));
+    }
     melodyQuestion = { progressionId, progression, tonic: key.midi, harmony, melody, voicings };
     renderMelodyQuestion();
   }
@@ -1211,7 +1269,7 @@
   }
 
   function pianoRollKeyGeometry(width, keyboardTop, keyboardHeight) {
-    const minimumMidi = 36;
+    const minimumMidi = 24;
     const maximumMidi = 84;
     const blackPitchClasses = new Set([1, 3, 6, 8, 10]);
     const whiteCount = Array.from({ length: maximumMidi - minimumMidi }, (_, index) => minimumMidi + index)
@@ -1402,6 +1460,8 @@
     melodyLoopInputs.forEach(input => { input.disabled = false; });
     melodyChordSpeed.disabled = false;
     melodyReferenceSpeed.disabled = false;
+    melodyProgressionSelect.disabled = false;
+    melodyKeySelect.disabled = false;
     activeMelodyButton = null;
     clearMelodyHighlights();
     stopMelodyVisualizer();
@@ -1424,12 +1484,25 @@
     melodyLoopInputs.forEach(input => { input.disabled = true; });
     melodyChordSpeed.disabled = true;
     melodyReferenceSpeed.disabled = true;
+    melodyProgressionSelect.disabled = true;
+    melodyKeySelect.disabled = true;
   }
 
   function highlightMelodyChord(index, atTime) {
     scheduleUi(Math.max(0, atTime - audioContext.currentTime), () => {
       clearMelodyHighlights();
-      melodyTimeline.querySelector(`[data-melody-chord-index="${index}"]`)?.classList.add('is-playing');
+      const cell = melodyTimeline.querySelector(`[data-melody-chord-index="${index}"]`);
+      if (!cell) return;
+      cell.classList.add('is-playing');
+      const scroller = melodyTimeline.parentElement;
+      const left = cell.offsetLeft;
+      const right = left + cell.offsetWidth;
+      if (left < scroller.scrollLeft || right > scroller.scrollLeft + scroller.clientWidth) {
+        scroller.scrollTo({
+          left: Math.max(0, left - (scroller.clientWidth - cell.offsetWidth) / 2),
+          behavior: 'smooth'
+        });
+      }
     });
   }
 
@@ -1437,30 +1510,37 @@
     const lookAhead = Math.min(2.2, Math.max(1.4, melodyChordSeconds * 1.35));
     const events = [];
     const chordStarts = [];
+    const visualTranspose = pitchClass(melodyQuestion.tonic);
     let cursor = start + lookAhead;
     melodyQuestion.harmony.forEach((chord, index) => {
       const chordDuration = melodyChordSeconds * (chord.length || 1);
       const chordToneDuration = Math.max(0.26, chordDuration * 0.92);
       chordStarts.push(cursor);
+      highlightMelodyChord(index, cursor);
       melodyQuestion.voicings[index].forEach(midi => {
         scheduleTone(midi, cursor, chordToneDuration, 0.065, 'piano');
-        events.push({ midi, start: cursor, end: cursor + chordToneDuration, type: 'chord' });
+        events.push({ midi: midi - visualTranspose, start: cursor, end: cursor + chordToneDuration, type: 'chord' });
       });
+      const notes = melodyQuestion.melody[index];
+      const headDuration = Math.max(0.24, Math.min(0.7, chordDuration * 0.46));
       if (includeMelody) {
-        const notes = melodyQuestion.melody[index];
-        const headDuration = Math.max(0.24, Math.min(0.7, chordDuration * 0.46));
         scheduleTone(notes.head, cursor, headDuration, 0.14, 'piano');
-        events.push({ midi: notes.head, start: cursor, end: cursor + headDuration, type: 'melody' });
-        if (notes.middle !== null) {
-          const middleStart = cursor + chordDuration / 2;
-          const middleDuration = Math.max(0.22, chordDuration * 0.42);
-          scheduleTone(notes.middle, middleStart, middleDuration, 0.14, 'piano');
-          events.push({ midi: notes.middle, start: middleStart, end: middleStart + middleDuration, type: 'melody' });
-        }
+      }
+      events.push({ midi: notes.head - visualTranspose, start: cursor, end: cursor + headDuration, type: 'melody' });
+      if (notes.middle !== null) {
+        const middleStart = cursor + chordDuration / 2;
+        const middleDuration = Math.max(0.22, chordDuration * 0.42);
+        if (includeMelody) scheduleTone(notes.middle, middleStart, middleDuration, 0.14, 'piano');
+        events.push({
+          midi: notes.middle - visualTranspose,
+          start: middleStart,
+          end: middleStart + middleDuration,
+          type: 'melody'
+        });
       }
       cursor += chordDuration;
     });
-    startMelodyVisualizer(events, chordStarts, lookAhead + 0.45, includeMelody);
+    startMelodyVisualizer(events, chordStarts, lookAhead + 0.45, true);
     return cursor + 0.3;
   }
 
@@ -2062,6 +2142,16 @@
       melodyLoops = Number(input.value);
       generateMelodyQuestion();
     });
+  });
+
+  melodyProgressionSelect.addEventListener('change', () => {
+    fixedMelodyProgressionId = melodyProgressionSelect.value;
+    generateMelodyQuestion();
+  });
+
+  melodyKeySelect.addEventListener('change', () => {
+    fixedMelodyKeyIndex = melodyKeySelect.value === 'random' ? null : Number(melodyKeySelect.value);
+    generateMelodyQuestion();
   });
 
   melodyChordSpeed.addEventListener('input', () => {

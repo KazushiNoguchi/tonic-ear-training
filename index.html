@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-5">
+  <link rel="stylesheet" href="styles.css?v=20260903-6">
 </head>
 <body>
   <div class="shell">
@@ -247,6 +247,13 @@
               <label><input type="radio" name="melodyLoops" value="4"><span>4</span></label>
             </div>
           </fieldset>
+          <fieldset class="melody-option-group melody-fixed-group">
+            <legend>固定</legend>
+            <div class="melody-fixed-options">
+              <label><span>コード進行</span><select id="melodyProgressionSelect"></select></label>
+              <label><span>調</span><select id="melodyKeySelect"></select></label>
+            </div>
+          </fieldset>
         </div>
       </section>
 
@@ -291,6 +298,6 @@
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260903-4"></script>
+  <script src="app.js?v=20260903-6"></script>
 </body>
 </html>
