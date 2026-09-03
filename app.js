@@ -963,23 +963,21 @@
     return `${NOTE_NAMES[pitchClass(tonic + chord.root)]}${chordQualitySuffix(chord.quality)}`;
   }
 
-  function melodySolfegeParts(midi, tonic) {
-    const relative = midi - tonic;
-    const octave = Math.floor(relative / 12);
+  function melodySolfegeParts(midi, tonic, previousMidi = null) {
     return {
-      name: CHROMATIC_SOLFEGE[pitchClass(relative)],
-      marker: octave > 0 ? '↑'.repeat(octave) : octave < 0 ? '↓'.repeat(Math.abs(octave)) : ''
+      name: CHROMATIC_SOLFEGE[pitchClass(midi - tonic)],
+      marker: previousMidi === null || midi === previousMidi ? '' : midi > previousMidi ? '↑' : '↓'
     };
   }
 
-  function createMelodyNoteNode(midi, tonic, rest = false) {
+  function createMelodyNoteNode(midi, tonic, rest = false, previousMidi = null) {
     const note = document.createElement('span');
     note.className = rest ? 'melody-note melody-rest' : 'melody-note';
     if (rest) {
       note.textContent = '休';
       return note;
     }
-    const parts = melodySolfegeParts(midi, tonic);
+    const parts = melodySolfegeParts(midi, tonic, previousMidi);
     note.append(document.createTextNode(parts.name));
     if (parts.marker) {
       const marker = document.createElement('small');
@@ -995,6 +993,7 @@
     melodyProgressionName.textContent = melodyQuestion.progression.label;
     melodyTimeline.replaceChildren();
     melodyTimeline.parentElement.scrollLeft = 0;
+    let previousMelodyMidi = null;
 
     melodyQuestion.harmony.forEach((chord, index) => {
       const cell = document.createElement('article');
@@ -1013,10 +1012,13 @@
       const notes = document.createElement('div');
       notes.className = 'melody-notes';
       notes.style.setProperty('--note-count', isHalf ? '1' : '2');
-      notes.appendChild(createMelodyNoteNode(melodyQuestion.melody[index].head, melodyQuestion.tonic));
+      const head = melodyQuestion.melody[index].head;
+      notes.appendChild(createMelodyNoteNode(head, melodyQuestion.tonic, false, previousMelodyMidi));
+      previousMelodyMidi = head;
       if (!isHalf) {
         const middle = melodyQuestion.melody[index].middle;
-        notes.appendChild(createMelodyNoteNode(middle, melodyQuestion.tonic, middle === null));
+        notes.appendChild(createMelodyNoteNode(middle, melodyQuestion.tonic, middle === null, previousMelodyMidi));
+        if (middle !== null) previousMelodyMidi = middle;
       }
       cell.append(chordName, notes);
       melodyTimeline.appendChild(cell);
@@ -1369,15 +1371,26 @@
       const barHeight = Math.max(12, (event.end - event.start) * pixelsPerSecond);
       const top = bottom - barHeight;
       if (bottom < -4 || top > strikeY + 4) return;
-      const inset = event.type === 'melody' ? 1 : Math.max(1, key.width * 0.12);
-      const x = key.x + inset;
-      const noteWidth = Math.max(3, key.width - inset * 2);
+      const inset = Math.max(1, key.width * 0.12);
+      const noteWidth = event.type === 'melody' ? Math.max(22, key.width - 2) : Math.max(3, key.width - inset * 2);
+      const x = event.type === 'melody' ? key.x + (key.width - noteWidth) / 2 : key.x + inset;
       context.fillStyle = event.type === 'melody' ? '#f15a35' : '#a8d8c5';
       context.shadowColor = event.type === 'melody' ? 'rgba(241, 90, 53, 0.5)' : 'rgba(168, 216, 197, 0.32)';
       context.shadowBlur = event.type === 'melody' ? 10 : 5;
       drawRoundedRect(context, x, top, noteWidth, barHeight, Math.min(5, noteWidth / 3));
       context.fill();
       context.shadowBlur = 0;
+      if (event.type === 'melody' && event.label) {
+        const visibleTop = Math.max(0, top);
+        const visibleBottom = Math.min(strikeY, bottom);
+        if (visibleBottom - visibleTop >= 12) {
+          context.fillStyle = '#fff';
+          context.font = '700 9px "Noto Sans JP", sans-serif';
+          context.textAlign = 'center';
+          context.textBaseline = 'middle';
+          context.fillText(event.label, x + noteWidth / 2, (visibleTop + visibleBottom) / 2);
+        }
+      }
       if (now >= event.start && now <= event.end) activeKeys.set(event.midi, event.type);
     });
     context.restore();
@@ -1526,7 +1539,13 @@
       if (includeMelody) {
         scheduleTone(notes.head, cursor, headDuration, 0.14, 'piano');
       }
-      events.push({ midi: notes.head - visualTranspose, start: cursor, end: cursor + headDuration, type: 'melody' });
+      events.push({
+        midi: notes.head - visualTranspose,
+        start: cursor,
+        end: cursor + headDuration,
+        type: 'melody',
+        label: CHROMATIC_SOLFEGE[pitchClass(notes.head - melodyQuestion.tonic)]
+      });
       if (notes.middle !== null) {
         const middleStart = cursor + chordDuration / 2;
         const middleDuration = Math.max(0.22, chordDuration * 0.42);
@@ -1535,7 +1554,8 @@
           midi: notes.middle - visualTranspose,
           start: middleStart,
           end: middleStart + middleDuration,
-          type: 'melody'
+          type: 'melody',
+          label: CHROMATIC_SOLFEGE[pitchClass(notes.middle - melodyQuestion.tonic)]
         });
       }
       cursor += chordDuration;
