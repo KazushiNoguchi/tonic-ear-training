@@ -356,7 +356,11 @@
         correct: 0,
         totalPlays: 0,
         correctPlays: 0,
-        onePlayCorrect: 0
+        onePlayCorrect: 0,
+        totalResponseSeconds: 0,
+        correctResponseSeconds: 0,
+        timedTotal: 0,
+        timedCorrect: 0
       }
     };
   }
@@ -434,24 +438,32 @@
     addAnswerToStats(lifetimeStats.modes[session.sequenceLength], targetInterval, answerInterval, isCorrect, keyIndex);
   }
 
-  function addQuestionToStats(stats, isCorrect, playCount) {
+  function addQuestionToStats(stats, isCorrect, playCount, responseSeconds) {
     stats.questions.total += 1;
     stats.questions.totalPlays += playCount;
+    stats.questions.totalResponseSeconds += responseSeconds;
+    stats.questions.timedTotal += 1;
     if (isCorrect) {
       stats.questions.correct += 1;
       stats.questions.correctPlays += playCount;
+      stats.questions.correctResponseSeconds += responseSeconds;
+      stats.questions.timedCorrect += 1;
       if (playCount === 1) stats.questions.onePlayCorrect += 1;
     }
   }
 
-  function recordQuestion(isCorrect, playCount) {
-    addQuestionToStats(sessionStats, isCorrect, playCount);
-    addQuestionToStats(lifetimeStats.modes[session.sequenceLength], isCorrect, playCount);
+  function recordQuestion(isCorrect, playCount, responseSeconds) {
+    addQuestionToStats(sessionStats, isCorrect, playCount, responseSeconds);
+    addQuestionToStats(lifetimeStats.modes[session.sequenceLength], isCorrect, playCount, responseSeconds);
     saveStats();
   }
 
   function formatAverage(total, count) {
     return count ? `${(total / count).toFixed(2)}回` : '—';
+  }
+
+  function formatTimeAverage(total, count) {
+    return count ? `${(total / count).toFixed(2)}秒` : '—';
   }
 
   function rateText(correct, total) {
@@ -490,6 +502,8 @@
         <div class="analysis-metric"><span class="analysis-metric-label">全体の平均再生回数</span><span class="analysis-metric-value">${formatAverage(questions.totalPlays, questions.total)}</span></div>
         <div class="analysis-metric"><span class="analysis-metric-label">正解時の平均再生回数</span><span class="analysis-metric-value">${formatAverage(questions.correctPlays, questions.correct)}</span></div>
         <div class="analysis-metric"><span class="analysis-metric-label">一発再生で正解できた回数</span><span class="analysis-metric-value">${questions.onePlayCorrect}回</span></div>
+        <div class="analysis-metric"><span class="analysis-metric-label">正解時の平均解答時間</span><span class="analysis-metric-value">${formatTimeAverage(questions.correctResponseSeconds, questions.timedCorrect)}</span></div>
+        <div class="analysis-metric"><span class="analysis-metric-label">すべての平均解答時間</span><span class="analysis-metric-value">${formatTimeAverage(questions.totalResponseSeconds, questions.timedTotal)}</span></div>
       </div>
       <section class="analysis-section">
         <h3>各音の正答率</h3>
@@ -1161,7 +1175,9 @@
       intervals,
       targetMidis,
       windowStart,
-      playCount: 0
+      playCount: 0,
+      responseStartedAt: null,
+      responseSeconds: null
     };
   }
 
@@ -1652,6 +1668,10 @@
     currentRound.targetMidis.forEach((midi, index) => {
       scheduleTone(midi, targetStart + index * 0.5, 0.48, 0.24);
     });
+    if (!reviewMode && currentRound.responseStartedAt === null) {
+      currentRound.responseStartedAt = performance.now()
+        + Math.max(0, targetStart - audioContext.currentTime) * 1000;
+    }
 
     const idAtStart = playbackId;
     if (includePrelude) {
@@ -1668,10 +1688,10 @@
       statusCopy.textContent = '';
       setSequence(1, 0);
     });
-    const answerReadyDelay = targetStart - audioContext.currentTime + session.sequenceLength * 0.5 + 0.25;
-    scheduleUi(answerReadyDelay, () => {
-      if (idAtStart !== playbackId) return;
-      if (reviewMode) {
+    if (reviewMode) {
+      const playbackEndDelay = targetStart - audioContext.currentTime + session.sequenceLength * 0.5 + 0.25;
+      scheduleUi(playbackEndDelay, () => {
+        if (idAtStart !== playbackId) return;
         state = 'feedback';
         game.classList.remove('is-playing');
         phaseText.textContent = lastRoundCorrect ? '正解' : '不正解';
@@ -1684,18 +1704,22 @@
         nextButton.disabled = false;
         nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
         liveRegion.textContent = '再生が終わりました。';
-        return;
-      }
-      state = 'answering';
-      game.classList.remove('is-playing');
-      phaseText.textContent = '回答';
-      headline.textContent = session.sequenceLength === 1 ? '音を選んでください' : `0 / ${session.sequenceLength}`;
-      setSequence(2, 1);
-      setKeysEnabled(true);
-      replayButton.disabled = false;
-      clearAnswerButton.disabled = true;
-      liveRegion.textContent = `再生が終わりました。${session.sequenceLength}音を順番に回答してください。`;
-    });
+      });
+    } else {
+      const inputStart = targetStart + (session.sequenceLength - 1) * 0.5;
+      scheduleUi(inputStart - audioContext.currentTime, () => {
+        if (idAtStart !== playbackId) return;
+        state = 'answering';
+        game.classList.remove('is-playing');
+        phaseText.textContent = '回答';
+        headline.textContent = session.sequenceLength === 1 ? '音を選んでください' : `0 / ${session.sequenceLength}`;
+        setSequence(2, 1);
+        setKeysEnabled(true);
+        replayButton.disabled = false;
+        clearAnswerButton.disabled = true;
+        liveRegion.textContent = `${session.sequenceLength}音を順番に回答してください。`;
+      });
+    }
   }
 
   function startRound() {
@@ -1827,6 +1851,10 @@
     replayButton.disabled = true;
     clearAnswerButton.disabled = true;
     attempts += 1;
+    currentRound.responseSeconds = currentRound.responseStartedAt === null
+      ? 0
+      : Math.max(0, (performance.now() - currentRound.responseStartedAt) / 1000);
+    const responseTimeText = `${currentRound.responseSeconds.toFixed(2)}秒`;
 
     const positionResults = userAnswers.map((answerIndex, index) => answerIndex === currentRound.degrees[index]);
     const correct = positionResults.every(Boolean);
@@ -1839,7 +1867,7 @@
         currentRound.keyIndex
       );
     });
-    recordQuestion(correct, currentRound.playCount);
+    recordQuestion(correct, currentRound.playCount, currentRound.responseSeconds);
 
     const answerNames = userAnswers.map(index => session.mode.names[index]);
     const correctNames = currentRound.degrees.map(index => session.mode.names[index]);
@@ -1864,10 +1892,10 @@
         scheduleSequence(selectedMidis, now);
       }
       feedbackMain.textContent = '正解';
-      feedbackDetail.textContent = `${correctNames.join(' → ')} ／ ${currentRound.key.name}`;
+      feedbackDetail.textContent = `${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`;
       headline.textContent = '正解';
       phaseText.textContent = '正解';
-      liveRegion.textContent = `正解。${correctNames.join('、')}です。`;
+      liveRegion.textContent = `正解。${correctNames.join('、')}です。解答時間は${responseTimeText}です。`;
     } else {
       streak = 0;
       if (isSingleNote) {
@@ -1879,10 +1907,10 @@
         scheduleSequence(currentRound.targetMidis, now + selectedMidis.length * 0.5 + 0.35);
       }
       feedbackMain.textContent = '不正解';
-      feedbackDetail.textContent = `回答：${answerNames.join(' → ')} ／ 正解：${correctNames.join(' → ')} ／ ${currentRound.key.name}`;
+      feedbackDetail.textContent = `回答：${answerNames.join(' → ')} ／ 正解：${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`;
       headline.textContent = '不正解';
       phaseText.textContent = '不正解';
-      liveRegion.textContent = `不正解。正解は${correctNames.join('、')}です。`;
+      liveRegion.textContent = `不正解。正解は${correctNames.join('、')}です。解答時間は${responseTimeText}です。`;
     }
 
     scoreNode.textContent = score;
