@@ -855,7 +855,7 @@
     const possiblePitchClasses = [...new Set([...chordTones, ...scaleTones])];
     const lowerHead = Math.min(currentHead, nextHead);
     const upperHead = Math.max(currentHead, nextHead);
-    const choices = pitchesInRange(range.minimum, range.maximum, possiblePitchClasses)
+    let choices = pitchesInRange(range.minimum, range.maximum, possiblePitchClasses)
       .filter(midi => {
         const isChordTone = chordTones.includes(pitchClass(midi));
         const isAdjacentScaleTone = scaleTones.includes(pitchClass(midi))
@@ -877,6 +877,12 @@
         value: midi,
         weight: midi < lowerHead || midi > upperHead ? 0.5 : 1
       }));
+    if (Math.abs(nextHead - currentHead) >= 7) {
+      choices = choices.filter(choice => choice.value > lowerHead && choice.value < upperHead);
+      if (!choices.length) return null;
+      const nearestDistance = Math.min(...choices.map(choice => Math.abs(choice.value - nextHead)));
+      choices = choices.filter(choice => Math.abs(choice.value - nextHead) === nearestDistance);
+    }
     return weightedChoice(choices);
   }
 
