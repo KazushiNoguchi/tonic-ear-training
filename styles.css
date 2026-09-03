@@ -358,6 +358,8 @@ main {
 .data-table th:last-child, .data-table td:last-child { border-right: 0; }
 .data-table small { display: block; margin-top: 3px; color: rgba(23, 22, 20, 0.48); font: 400 9px/1 "DM Mono", monospace; }
 .note-stats-table th:first-child, .note-stats-table td:first-child { min-width: 54px; }
+.note-stats-table tr.slowest-note > th,
+.note-stats-table tr.slowest-note > td { background: rgba(219, 61, 50, 0.14); color: var(--red); font-weight: 700; }
 .key-stats-table th:first-child, .key-stats-table td:first-child { min-width: 48px; }
 .stats-back { margin-top: 25px; }
 .stats-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 25px; }

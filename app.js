@@ -346,7 +346,12 @@
     return {
       total: 0,
       correct: 0,
-      notes: Array.from({ length: 12 }, () => ({ total: 0, correct: 0 })),
+      notes: Array.from({ length: 12 }, () => ({
+        total: 0,
+        correct: 0,
+        totalResponseSeconds: 0,
+        timedTotal: 0
+      })),
       confusion: Array.from({ length: 12 }, () => Array(12).fill(0)),
       keys: Array.from({ length: 12 }, () =>
         Array.from({ length: 12 }, () => ({ total: 0, correct: 0 }))
@@ -383,6 +388,8 @@
     target.notes.forEach((note, index) => {
       note.total = Number(saved.notes[index]?.total) || 0;
       note.correct = Number(saved.notes[index]?.correct) || 0;
+      note.totalResponseSeconds = Number(saved.notes[index]?.totalResponseSeconds) || 0;
+      note.timedTotal = Number(saved.notes[index]?.timedTotal) || 0;
     });
     target.confusion.forEach((row, targetInterval) => {
       row.forEach((_, answerInterval) => {
@@ -421,9 +428,11 @@
     try { localStorage.setItem(STATS_STORAGE_KEY, JSON.stringify(lifetimeStats)); } catch (_) {}
   }
 
-  function addAnswerToStats(stats, targetInterval, answerInterval, isCorrect, keyIndex) {
+  function addAnswerToStats(stats, targetInterval, answerInterval, isCorrect, keyIndex, responseSeconds) {
     stats.total += 1;
     stats.notes[targetInterval].total += 1;
+    stats.notes[targetInterval].totalResponseSeconds += responseSeconds;
+    stats.notes[targetInterval].timedTotal += 1;
     stats.confusion[targetInterval][answerInterval] += 1;
     stats.keys[keyIndex][targetInterval].total += 1;
     if (isCorrect) {
@@ -433,9 +442,16 @@
     }
   }
 
-  function recordAnswer(targetInterval, answerInterval, isCorrect, keyIndex) {
-    addAnswerToStats(sessionStats, targetInterval, answerInterval, isCorrect, keyIndex);
-    addAnswerToStats(lifetimeStats.modes[session.sequenceLength], targetInterval, answerInterval, isCorrect, keyIndex);
+  function recordAnswer(targetInterval, answerInterval, isCorrect, keyIndex, responseSeconds) {
+    addAnswerToStats(sessionStats, targetInterval, answerInterval, isCorrect, keyIndex, responseSeconds);
+    addAnswerToStats(
+      lifetimeStats.modes[session.sequenceLength],
+      targetInterval,
+      answerInterval,
+      isCorrect,
+      keyIndex,
+      responseSeconds
+    );
   }
 
   function addQuestionToStats(stats, isCorrect, playCount, responseSeconds) {
@@ -486,8 +502,18 @@
     const names = MODES.chromatic.names;
     const questions = stats.questions;
     const mistake = mostCommonMistake(stats);
+    let slowestNoteIndex = -1;
+    let slowestAverageSeconds = -1;
+    stats.notes.forEach((note, index) => {
+      if (!note.timedTotal) return;
+      const average = note.totalResponseSeconds / note.timedTotal;
+      if (average > slowestAverageSeconds) {
+        slowestAverageSeconds = average;
+        slowestNoteIndex = index;
+      }
+    });
     const noteRows = stats.notes.map((note, index) => `
-      <tr><th scope="row">${names[index]}</th><td>${rateText(note.correct, note.total)}</td><td>${note.correct}/${note.total}</td></tr>`).join('');
+      <tr${index === slowestNoteIndex ? ' class="slowest-note"' : ''}><th scope="row">${names[index]}</th><td>${rateText(note.correct, note.total)}</td><td>${note.correct}/${note.total}</td><td>${formatTimeAverage(note.totalResponseSeconds, note.timedTotal)}</td></tr>`).join('');
     const confusionHead = names.map(name => `<th scope="col">${name}</th>`).join('');
     const confusionRows = stats.confusion.map((row, target) => `
       <tr><th scope="row">${names[target]}</th>${row.map(count => `<td>${count || '—'}</td>`).join('')}</tr>`).join('');
@@ -506,9 +532,9 @@
         <div class="analysis-metric"><span class="analysis-metric-label">すべての平均解答時間</span><span class="analysis-metric-value">${formatTimeAverage(questions.totalResponseSeconds, questions.timedTotal)}</span></div>
       </div>
       <section class="analysis-section">
-        <h3>各音の正答率</h3>
+        <h3>各音の統計</h3>
         <div class="data-table-wrap"><table class="data-table note-stats-table">
-          <thead><tr><th scope="col">音</th><th scope="col">正答率</th><th scope="col">正解/出題</th></tr></thead>
+          <thead><tr><th scope="col">音</th><th scope="col">正答率</th><th scope="col">正解/出題</th><th scope="col">平均解答時間</th></tr></thead>
           <tbody>${noteRows}</tbody>
         </table></div>
       </section>
@@ -1864,7 +1890,8 @@
         interval,
         session.mode.intervals[userAnswers[index]],
         positionResults[index],
-        currentRound.keyIndex
+        currentRound.keyIndex,
+        currentRound.responseSeconds
       );
     });
     recordQuestion(correct, currentRound.playCount, currentRound.responseSeconds);
