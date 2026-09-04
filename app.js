@@ -638,7 +638,7 @@
       high: false
     }));
     choices.push({ interval: 0, answerIndex: 0, degree: 'I', shortcut: choices.length + 1, high: true });
-    keyboard.style.setProperty('--key-count', String(choices.length));
+    keyboard.style.setProperty('--key-count', String(session.mode.intervals.length));
     choices.forEach((choice, buttonIndex) => {
       const name = noteName(choice.interval, choice.high);
       const isAccidental = ![0, 2, 4, 5, 7, 9, 11].includes(choice.interval);
@@ -648,6 +648,7 @@
       button.dataset.answerIndex = String(choice.answerIndex);
       button.dataset.interval = String(choice.interval);
       button.dataset.high = String(choice.high);
+      button.hidden = choice.high;
       button.disabled = true;
       button.setAttribute('aria-label', `${name}、主音から${choice.high ? 12 : choice.interval}半音`);
       const pianoBinding = pianoBindingForInterval(choice.high ? 12 : choice.interval, choice.high);
@@ -670,6 +671,12 @@
       button.setAttribute('aria-label', `${name}、主音から${high ? 12 : interval}半音`);
       button.dataset.buttonIndex = String(buttonIndex);
     });
+  }
+
+  function showHighTonicKey(show) {
+    const highTonicButton = keyButtons.find(button => button.dataset.high === 'true');
+    if (highTonicButton) highTonicButton.hidden = !show;
+    keyboard.style.setProperty('--key-count', String(session.mode.intervals.length + (show ? 1 : 0)));
   }
 
   function renderMelodyKeyboard() {
@@ -1779,6 +1786,7 @@
       currentRound.playCount += 1;
       userAnswers = [];
       resetKeyStyles();
+      showHighTonicKey(false);
     }
     setKeysEnabled(false);
     feedback.classList.remove('visible');
@@ -2100,6 +2108,7 @@
     accuracyNode.textContent = `${Math.round((score / attempts) * 100)}%`;
     statusCopy.textContent = '';
     feedback.classList.add('visible');
+    showHighTonicKey(true);
     setSequence(-1, 2);
     nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
     nextButton.disabled = false;
@@ -2448,7 +2457,7 @@
       }
       if (['answering', 'feedback'].includes(state)) {
         const buttonIndex = keyButtons.findIndex(button => pianoBinding.high
-          ? button.dataset.high === 'true'
+          ? button.dataset.high === 'true' && !button.hidden
           : button.dataset.high === 'false' && Number(button.dataset.interval) === pianoBinding.interval);
         if (buttonIndex !== -1) {
           event.preventDefault();
@@ -2460,6 +2469,7 @@
     if (!['answering', 'feedback'].includes(state)) return;
     const number = Number(event.key);
     if (number >= 1 && number <= Math.min(9, keyButtons.length)) {
+      if (keyButtons[number - 1].hidden) return;
       event.preventDefault();
       answer(number - 1);
     }
