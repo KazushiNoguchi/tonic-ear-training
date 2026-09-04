@@ -10,6 +10,21 @@
     chromaticFlat: ['ド', 'ラ', 'レ', 'メ', 'ミ', 'ファ', 'セ', 'ソ', 'レ', 'ラ', 'テ', 'ティ'],
     noro: ['ド', 'ディ', 'レ', 'メ', 'ミ', 'ファ', 'フィ', 'ソ', 'スィ', 'ラ', 'リ', 'シ']
   };
+  const PIANO_KEY_BINDINGS = [
+    { key: 'z', code: 'KeyZ', interval: 0 },
+    { key: 's', code: 'KeyS', interval: 1 },
+    { key: 'x', code: 'KeyX', interval: 2 },
+    { key: 'd', code: 'KeyD', interval: 3 },
+    { key: 'c', code: 'KeyC', interval: 4 },
+    { key: 'v', code: 'KeyV', interval: 5 },
+    { key: 'g', code: 'KeyG', interval: 6 },
+    { key: 'b', code: 'KeyB', interval: 7 },
+    { key: 'h', code: 'KeyH', interval: 8 },
+    { key: 'n', code: 'KeyN', interval: 9 },
+    { key: 'j', code: 'KeyJ', interval: 10 },
+    { key: 'm', code: 'KeyM', interval: 11 },
+    { key: ',', code: 'Comma', interval: 12, high: true }
+  ];
   const MODES = {
     pentatonic: {
       label: 'ペンタトニック',
@@ -335,6 +350,10 @@
     return noteName(mode.intervals[degreeIndex]);
   }
 
+  function pianoShortcutForInterval(interval, high = false) {
+    return PIANO_KEY_BINDINGS.find(binding => binding.interval === interval && Boolean(binding.high) === high)?.key.toUpperCase() || '';
+  }
+
   const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
   let masterVolume = 0.3;
   try {
@@ -630,14 +649,14 @@
       button.dataset.high = String(choice.high);
       button.disabled = true;
       button.setAttribute('aria-label', `${name}、主音から${choice.high ? 12 : choice.interval}半音`);
-      button.innerHTML = `<span class="key-solfege">${name}</span><span class="key-degree">${choice.degree} · ${choice.high ? '↑' : choice.shortcut}</span>`;
+      const pianoShortcut = pianoShortcutForInterval(choice.high ? 12 : choice.interval, choice.high);
+      button.setAttribute('aria-keyshortcuts', pianoShortcut);
+      button.innerHTML = `<span class="key-solfege">${name}</span><span class="key-degree">${choice.degree} · ${pianoShortcut}</span>`;
       button.addEventListener('click', () => answer(buttonIndex));
       keyboard.appendChild(button);
     });
     keyButtons = [...keyboard.querySelectorAll('.key')];
-    keyboardHint.textContent = choices.length <= 9
-      ? `KEYS 1—${choices.length}`
-      : 'CLICK / TAP';
+    keyboardHint.textContent = 'Z S X D C V G B H N J M ,';
   }
 
   function refreshAnswerKeyboardLabels() {
@@ -660,17 +679,22 @@
       button.type = 'button';
       button.className = `key${![0, 2, 4, 5, 7, 9, 11, 12].includes(interval) ? ' accidental' : ''}${high ? ' high-tonic' : ''}`;
       button.setAttribute('aria-label', `${noteName(interval, high)}、主音から${interval}半音`);
-      button.innerHTML = `<span class="key-solfege">${noteName(interval, high)}</span><span class="key-degree">${interval === 12 ? 'I · ↑' : `${interval} ST`}</span>`;
-      button.addEventListener('click', () => {
-        ensureAudio();
-        preparePianoSamples();
-        button.classList.add('pressed');
-        window.setTimeout(() => button.classList.remove('pressed'), 160);
-        const tonic = melodyQuestion?.tonic ?? 48;
-        scheduleTone(tonic + 12 + interval, audioContext.currentTime + 0.01, 0.55, 0.16, 'piano');
-      });
+      const pianoShortcut = pianoShortcutForInterval(interval, high);
+      button.setAttribute('aria-keyshortcuts', pianoShortcut);
+      button.innerHTML = `<span class="key-solfege">${noteName(interval, high)}</span><span class="key-degree">${pianoShortcut}</span>`;
+      button.addEventListener('click', () => playMelodyKeyboardKey(interval));
       melodyKeyboard.appendChild(button);
     }
+  }
+
+  function playMelodyKeyboardKey(interval) {
+    ensureAudio();
+    preparePianoSamples();
+    const button = melodyKeyboard.children[interval];
+    button?.classList.add('pressed');
+    window.setTimeout(() => button?.classList.remove('pressed'), 160);
+    const tonic = melodyQuestion?.tonic ?? 48;
+    scheduleTone(tonic + 12 + interval, audioContext.currentTime + 0.01, 0.55, 0.16, 'piano');
   }
 
   function updateNotationUI() {
@@ -2411,7 +2435,27 @@
   });
 
   document.addEventListener('keydown', event => {
-    if (event.repeat || !['answering', 'feedback'].includes(state)) return;
+    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    const pressedKey = event.key.length === 1 ? event.key.toLowerCase() : '';
+    const pianoBinding = PIANO_KEY_BINDINGS.find(binding => binding.code === event.code || binding.key === pressedKey);
+    if (pianoBinding) {
+      if (!melodyTrainer.hidden) {
+        event.preventDefault();
+        playMelodyKeyboardKey(pianoBinding.interval);
+        return;
+      }
+      if (['answering', 'feedback'].includes(state)) {
+        const buttonIndex = keyButtons.findIndex(button => pianoBinding.high
+          ? button.dataset.high === 'true'
+          : button.dataset.high === 'false' && Number(button.dataset.interval) === pianoBinding.interval);
+        if (buttonIndex !== -1) {
+          event.preventDefault();
+          answer(buttonIndex);
+        }
+        return;
+      }
+    }
+    if (!['answering', 'feedback'].includes(state)) return;
     const number = Number(event.key);
     if (number >= 1 && number <= Math.min(9, keyButtons.length)) {
       event.preventDefault();
