@@ -641,9 +641,10 @@
     keyboard.style.setProperty('--key-count', String(choices.length));
     choices.forEach((choice, buttonIndex) => {
       const name = noteName(choice.interval, choice.high);
+      const isAccidental = ![0, 2, 4, 5, 7, 9, 11].includes(choice.interval);
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `key${![0, 2, 4, 5, 7, 9, 11].includes(choice.interval) ? ' accidental' : ''}${choice.high ? ' high-tonic' : ''}`;
+      button.className = `key${isAccidental ? ' accidental' : ''}${choice.high ? ' high-tonic' : ''}`;
       button.dataset.answerIndex = String(choice.answerIndex);
       button.dataset.interval = String(choice.interval);
       button.dataset.high = String(choice.high);
@@ -652,7 +653,7 @@
       const pianoBinding = pianoBindingForInterval(choice.high ? 12 : choice.interval, choice.high);
       const pianoShortcut = pianoBinding.key.toUpperCase();
       button.setAttribute('aria-keyshortcuts', pianoShortcut);
-      button.innerHTML = `<span class="key-guide">${pianoShortcut} · ${pianoBinding.finger}</span><span class="key-solfege">${name}</span><span class="key-degree">${choice.degree}</span>`;
+      button.innerHTML = `<span class="key-guide">${pianoShortcut}${isAccidental ? '' : ` · ${pianoBinding.finger}`}</span><span class="key-solfege">${name}</span><span class="key-degree">${choice.degree}</span>`;
       button.addEventListener('click', () => answer(buttonIndex));
       keyboard.appendChild(button);
     });
@@ -676,14 +677,15 @@
     melodyKeyboard.style.setProperty('--key-count', '13');
     for (let interval = 0; interval <= 12; interval += 1) {
       const high = interval === 12;
+      const isAccidental = ![0, 2, 4, 5, 7, 9, 11, 12].includes(interval);
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `key${![0, 2, 4, 5, 7, 9, 11, 12].includes(interval) ? ' accidental' : ''}${high ? ' high-tonic' : ''}`;
+      button.className = `key${isAccidental ? ' accidental' : ''}${high ? ' high-tonic' : ''}`;
       button.setAttribute('aria-label', `${noteName(interval, high)}、主音から${interval}半音`);
       const pianoBinding = pianoBindingForInterval(interval, high);
       const pianoShortcut = pianoBinding.key.toUpperCase();
       button.setAttribute('aria-keyshortcuts', pianoShortcut);
-      button.innerHTML = `<span class="key-guide">${pianoShortcut} · ${pianoBinding.finger}</span><span class="key-solfege">${noteName(interval, high)}</span>`;
+      button.innerHTML = `<span class="key-guide">${pianoShortcut}${isAccidental ? '' : ` · ${pianoBinding.finger}`}</span><span class="key-solfege">${noteName(interval, high)}</span>`;
       button.addEventListener('click', () => playMelodyKeyboardKey(interval));
       melodyKeyboard.appendChild(button);
     }
@@ -2119,8 +2121,6 @@
     animateKey(index);
     userAnswers.push(index);
     if (userAnswers.length < session.sequenceLength) {
-      ensureAudio();
-      scheduleTone(answerButtonMidi(index), audioContext.currentTime + 0.01, 0.28, 0.22);
       headline.textContent = `${userAnswers.length} / ${session.sequenceLength}`;
       statusCopy.textContent = userAnswers.map(answerButtonName).join(' → ');
       clearAnswerButton.disabled = false;
