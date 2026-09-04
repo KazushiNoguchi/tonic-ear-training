@@ -1263,24 +1263,31 @@
       .map((interval, index) => ({ interval, index }))
       .filter(choice => !excludedIntervals.has(choice.interval))
       .map(choice => choice.index);
+    const tonicCandidates = [];
+    for (let tonicMidi = session.rangeMin - 11; tonicMidi <= session.rangeMax; tonicMidi += 1) {
+      if (pitchClass(tonicMidi) !== pitchClass(key.midi)) continue;
+      const degreesInRange = eligibleDegrees.filter(degree => {
+        const midi = tonicMidi + session.mode.intervals[degree];
+        return midi >= session.rangeMin && midi <= session.rangeMax;
+      });
+      if (degreesInRange.length) tonicCandidates.push({ tonicMidi, degreesInRange });
+    }
+    const maximumChoiceCount = Math.max(...tonicCandidates.map(candidate => candidate.degreesInRange.length));
+    const widestCandidates = tonicCandidates.filter(candidate => candidate.degreesInRange.length === maximumChoiceCount);
+    const selectedTonic = widestCandidates[randomIndex(widestCandidates.length)];
     const degrees = Array.from(
       { length: session.sequenceLength },
-      () => drawDegree(eligibleDegrees)
+      () => drawDegree(selectedTonic.degreesInRange)
     );
     const intervals = degrees.map(degree => session.mode.intervals[degree]);
-    const windowCount = session.rangeMax - session.rangeMin - 10;
-    const windowStart = session.rangeMin + randomIndex(windowCount);
-    const targetMidis = intervals.map(interval => {
-      const pitchClass = (key.midi + interval) % 12;
-      return windowStart + ((pitchClass - (windowStart % 12) + 12) % 12);
-    });
+    const targetMidis = intervals.map(interval => selectedTonic.tonicMidi + interval);
     return {
       keyIndex,
       key,
       degrees,
       intervals,
       targetMidis,
-      windowStart,
+      answerTonicMidi: selectedTonic.tonicMidi,
       playCount: 0,
       responseStartedAt: null,
       responseSeconds: null
@@ -1848,8 +1855,7 @@
   }
 
   function midiInRoundWindow(interval) {
-    const pitchClass = (currentRound.key.midi + interval) % 12;
-    return currentRound.windowStart + ((pitchClass - (currentRound.windowStart % 12) + 12) % 12);
+    return currentRound.answerTonicMidi + interval;
   }
 
   function scheduleTonicResolution(interval, targetMidi, start) {
