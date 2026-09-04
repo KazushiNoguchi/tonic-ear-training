@@ -11,19 +11,19 @@
     noro: ['ド', 'ディ', 'レ', 'メ', 'ミ', 'ファ', 'フィ', 'ソ', 'スィ', 'ラ', 'リ', 'シ']
   };
   const PIANO_KEY_BINDINGS = [
-    { key: 'z', code: 'KeyZ', interval: 0 },
-    { key: 's', code: 'KeyS', interval: 1 },
-    { key: 'x', code: 'KeyX', interval: 2 },
-    { key: 'd', code: 'KeyD', interval: 3 },
-    { key: 'c', code: 'KeyC', interval: 4 },
-    { key: 'v', code: 'KeyV', interval: 5 },
-    { key: 'g', code: 'KeyG', interval: 6 },
-    { key: 'b', code: 'KeyB', interval: 7 },
-    { key: 'h', code: 'KeyH', interval: 8 },
-    { key: 'n', code: 'KeyN', interval: 9 },
-    { key: 'j', code: 'KeyJ', interval: 10 },
-    { key: 'm', code: 'KeyM', interval: 11 },
-    { key: ',', code: 'Comma', interval: 12, high: true }
+    { key: 'z', code: 'KeyZ', interval: 0, finger: '小' },
+    { key: 's', code: 'KeyS', interval: 1, finger: '薬' },
+    { key: 'x', code: 'KeyX', interval: 2, finger: '薬' },
+    { key: 'd', code: 'KeyD', interval: 3, finger: '中' },
+    { key: 'c', code: 'KeyC', interval: 4, finger: '中' },
+    { key: 'v', code: 'KeyV', interval: 5, finger: '人' },
+    { key: 'g', code: 'KeyG', interval: 6, finger: '人' },
+    { key: 'b', code: 'KeyB', interval: 7, finger: '人' },
+    { key: 'h', code: 'KeyH', interval: 8, finger: '人' },
+    { key: 'n', code: 'KeyN', interval: 9, finger: '中' },
+    { key: 'j', code: 'KeyJ', interval: 10, finger: '中' },
+    { key: 'm', code: 'KeyM', interval: 11, finger: '薬' },
+    { key: ',', code: 'Comma', interval: 12, high: true, finger: '小' }
   ];
   const MODES = {
     pentatonic: {
@@ -350,8 +350,8 @@
     return noteName(mode.intervals[degreeIndex]);
   }
 
-  function pianoShortcutForInterval(interval, high = false) {
-    return PIANO_KEY_BINDINGS.find(binding => binding.interval === interval && Boolean(binding.high) === high)?.key.toUpperCase() || '';
+  function pianoBindingForInterval(interval, high = false) {
+    return PIANO_KEY_BINDINGS.find(binding => binding.interval === interval && Boolean(binding.high) === high);
   }
 
   const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
@@ -649,9 +649,10 @@
       button.dataset.high = String(choice.high);
       button.disabled = true;
       button.setAttribute('aria-label', `${name}、主音から${choice.high ? 12 : choice.interval}半音`);
-      const pianoShortcut = pianoShortcutForInterval(choice.high ? 12 : choice.interval, choice.high);
+      const pianoBinding = pianoBindingForInterval(choice.high ? 12 : choice.interval, choice.high);
+      const pianoShortcut = pianoBinding.key.toUpperCase();
       button.setAttribute('aria-keyshortcuts', pianoShortcut);
-      button.innerHTML = `<span class="key-solfege">${name}</span><span class="key-degree">${choice.degree} · ${pianoShortcut}</span>`;
+      button.innerHTML = `<span class="key-guide">${pianoShortcut} · ${pianoBinding.finger}</span><span class="key-solfege">${name}</span><span class="key-degree">${choice.degree}</span>`;
       button.addEventListener('click', () => answer(buttonIndex));
       keyboard.appendChild(button);
     });
@@ -679,9 +680,10 @@
       button.type = 'button';
       button.className = `key${![0, 2, 4, 5, 7, 9, 11, 12].includes(interval) ? ' accidental' : ''}${high ? ' high-tonic' : ''}`;
       button.setAttribute('aria-label', `${noteName(interval, high)}、主音から${interval}半音`);
-      const pianoShortcut = pianoShortcutForInterval(interval, high);
+      const pianoBinding = pianoBindingForInterval(interval, high);
+      const pianoShortcut = pianoBinding.key.toUpperCase();
       button.setAttribute('aria-keyshortcuts', pianoShortcut);
-      button.innerHTML = `<span class="key-solfege">${noteName(interval, high)}</span><span class="key-degree">${pianoShortcut}</span>`;
+      button.innerHTML = `<span class="key-guide">${pianoShortcut} · ${pianoBinding.finger}</span><span class="key-solfege">${noteName(interval, high)}</span>`;
       button.addEventListener('click', () => playMelodyKeyboardKey(interval));
       melodyKeyboard.appendChild(button);
     }

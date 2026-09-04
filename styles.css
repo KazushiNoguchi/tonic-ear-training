@@ -650,9 +650,21 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 
 .key:disabled { cursor: not-allowed; }
 
+.key-guide {
+  position: absolute;
+  top: 11px;
+  right: 0;
+  left: 0;
+  color: rgba(23, 22, 20, 0.5);
+  font: 500 10px/1 "DM Mono", monospace;
+  letter-spacing: 0.04em;
+}
+
+.key.accidental .key-guide { color: rgba(255, 255, 255, 0.58); }
+
 .key-solfege {
   display: block;
-  margin-top: 28px;
+  margin-top: 40px;
   font-size: clamp(22px, 3vw, 33px);
   font-weight: 700;
   letter-spacing: -0.05em;
@@ -886,7 +898,7 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 }
 
 .melody-keyboard .key { height: 96px; }
-.melody-keyboard .key-solfege { margin-top: 19px; font-size: clamp(13px, 1.55vw, 20px); }
+.melody-keyboard .key-solfege { margin-top: 34px; font-size: clamp(13px, 1.55vw, 20px); }
 
 .sr-only {
   position: absolute;
@@ -948,7 +960,8 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
   .keyboard.pentatonic { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .keyboard.chromatic { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
   .keyboard.chromatic .key { height: 82px; }
-  .keyboard.chromatic .key-solfege { margin-top: 18px; font-size: 17px; }
+  .keyboard.chromatic .key-solfege { margin-top: 29px; font-size: 17px; }
+  .keyboard.chromatic .key-guide { top: 7px; font-size: 9px; }
   .keyboard.chromatic .key.high-tonic .key-solfege { font-size: 14px; }
   .key { height: 112px; border-radius: 5px 5px 9px 9px; }
   .key-solfege { font-size: clamp(18px, 6vw, 27px); }
