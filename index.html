@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260903-7">
+  <link rel="stylesheet" href="styles.css?v=20260904-1">
 </head>
 <body>
   <div class="shell">
@@ -23,6 +23,16 @@
       </nav>
       <div class="header-actions">
         <div class="header-help">イヤホン推奨 ・ 音量にご注意ください</div>
+        <label class="notation-control" for="notationSelect">
+          <span>音名</span>
+          <select id="notationSelect" aria-label="音階の表記">
+            <option value="sharp">シャープ系</option>
+            <option value="flat">フラット系</option>
+            <option value="chromaticSharp">クロマチック♯</option>
+            <option value="chromaticFlat">クロマチック♭</option>
+            <option value="noro">のろ用</option>
+          </select>
+        </label>
         <label class="volume-control" for="volumeSlider">
           <span>VOL</span>
           <input id="volumeSlider" type="range" min="0" max="100" value="30" aria-label="音量">
@@ -113,18 +123,18 @@
                 <fieldset class="setting-group">
                   <legend>除外する音</legend>
                   <div class="exclude-grid">
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude0" value="0"><label for="exclude0">ド</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude1" value="1"><label for="exclude1">ド♯</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude2" value="2"><label for="exclude2">レ</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude3" value="3"><label for="exclude3">レ♯</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude4" value="4"><label for="exclude4">ミ</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude5" value="5"><label for="exclude5">ファ</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude6" value="6"><label for="exclude6">ファ♯</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude7" value="7"><label for="exclude7">ソ</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude8" value="8"><label for="exclude8">ソ♯</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude9" value="9"><label for="exclude9">ラ</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude10" value="10"><label for="exclude10">ラ♯</label></div>
-                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude11" value="11"><label for="exclude11">シ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude0" value="0"><label for="exclude0" data-note-interval="0">ド</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude1" value="1"><label for="exclude1" data-note-interval="1">ド♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude2" value="2"><label for="exclude2" data-note-interval="2">レ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude3" value="3"><label for="exclude3" data-note-interval="3">レ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude4" value="4"><label for="exclude4" data-note-interval="4">ミ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude5" value="5"><label for="exclude5" data-note-interval="5">ファ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude6" value="6"><label for="exclude6" data-note-interval="6">ファ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude7" value="7"><label for="exclude7" data-note-interval="7">ソ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude8" value="8"><label for="exclude8" data-note-interval="8">ソ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude9" value="9"><label for="exclude9" data-note-interval="9">ラ</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude10" value="10"><label for="exclude10" data-note-interval="10">ラ♯</label></div>
+                    <div class="exclude-option"><input type="checkbox" name="excludeNote" id="exclude11" value="11"><label for="exclude11" data-note-interval="11">シ</label></div>
                   </div>
                 </fieldset>
 
@@ -292,12 +302,19 @@
           </label>
         </div>
       </section>
+      <section class="melody-keyboard-wrap" aria-labelledby="melodyKeyboardTitle">
+        <div class="keyboard-labels">
+          <p class="keyboard-title" id="melodyKeyboardTitle">鍵盤</p>
+          <p class="keyboard-hint">CLICK / TAP</p>
+        </div>
+        <div class="keyboard chromatic melody-keyboard" id="melodyKeyboard" role="group" aria-label="試奏用の音階鍵盤"></div>
+      </section>
     </main>
     <footer class="site-version">Version 1.0</footer>
     <p class="sr-only" id="liveRegion" aria-live="assertive"></p>
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260903-10"></script>
+  <script src="app.js?v=20260904-1"></script>
 </body>
 </html>

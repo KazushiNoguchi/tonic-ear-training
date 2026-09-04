@@ -1,26 +1,29 @@
 (() => {
   'use strict';
 
-  const SOLFEGE = ['ド', 'レ', 'ミ', 'ファ', 'ソ', 'ラ', 'シ'];
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
   const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11];
+  const NOTE_NOTATIONS = {
+    sharp: ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'],
+    flat: ['ド', 'レ♭', 'レ', 'ミ♭', 'ミ', 'ファ', 'ソ♭', 'ソ', 'ラ♭', 'ラ', 'シ♭', 'シ'],
+    chromaticSharp: ['ド', 'ディ', 'レ', 'リ', 'ミ', 'ファ', 'フィ', 'ソ', 'スィ', 'ラ', 'リ', 'ティ'],
+    chromaticFlat: ['ド', 'ラ', 'レ', 'メ', 'ミ', 'ファ', 'セ', 'ソ', 'レ', 'ラ', 'テ', 'ティ'],
+    noro: ['ド', 'ディ', 'レ', 'メ', 'ミ', 'ファ', 'フィ', 'ソ', 'スィ', 'ラ', 'リ', 'シ']
+  };
   const MODES = {
     pentatonic: {
       label: 'ペンタトニック',
       intervals: [0, 2, 4, 7, 9],
-      names: ['ド', 'レ', 'ミ', 'ソ', 'ラ'],
       degrees: ['I', 'II', 'III', 'V', 'VI']
     },
     diatonic: {
       label: 'ダイアトニック',
       intervals: MAJOR_STEPS,
-      names: SOLFEGE,
       degrees: ROMAN
     },
     chromatic: {
       label: 'ノンダイアトニック',
       intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-      names: ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'],
       degrees: ['1', '♯1', '2', '♯2', '3', '4', '♯4', '5', '♯5', '6', '♯6', '7']
     }
   };
@@ -152,7 +155,6 @@
     .filter(([id]) => id !== 'basic');
 
   const NOTE_NAMES = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
-  const CHROMATIC_SOLFEGE = ['ド', 'ド♯', 'レ', 'レ♯', 'ミ', 'ファ', 'ファ♯', 'ソ', 'ソ♯', 'ラ', 'ラ♯', 'シ'];
   const MELODY_RANGES = {
     cgc2: { minimum: 0, maximum: 12 },
     gcg2: { minimum: -5, maximum: 7 },
@@ -163,6 +165,7 @@
   const game = document.querySelector('#game');
   const melodyTrainer = document.querySelector('#melodyTrainer');
   const trainingMenuButtons = [...document.querySelectorAll('[data-training-view]')];
+  const notationSelect = document.querySelector('#notationSelect');
   const volumeSlider = document.querySelector('#volumeSlider');
   const volumeValue = document.querySelector('#volumeValue');
   const keyboard = document.querySelector('#keyboard');
@@ -235,6 +238,7 @@
   const melodyReferenceSpeedValue = document.querySelector('#melodyReferenceSpeedValue');
   const melodyProgressionSelect = document.querySelector('#melodyProgressionSelect');
   const melodyKeySelect = document.querySelector('#melodyKeySelect');
+  const melodyKeyboard = document.querySelector('#melodyKeyboard');
   const melodyPlaybackButtons = [melodyChordsButton, melodyFirstNoteButton, melodyReferenceButton, melodyAnswerButton];
 
   function appendSelectOption(select, value, label) {
@@ -313,6 +317,23 @@
   let fixedMelodyKeyIndex = null;
   let melodyAnimationFrame = null;
   let melodyVisualizerState = null;
+
+  const NOTATION_STORAGE_KEY = 'tonic-ear-training-notation';
+  let notationId = 'sharp';
+  try {
+    const savedNotation = localStorage.getItem(NOTATION_STORAGE_KEY);
+    if (NOTE_NOTATIONS[savedNotation]) notationId = savedNotation;
+  } catch (_) {}
+  notationSelect.value = notationId;
+
+  function noteName(interval, high = false) {
+    const name = NOTE_NOTATIONS[notationId][pitchClass(interval)];
+    return high ? `高い${name}` : name;
+  }
+
+  function modeNoteName(mode, degreeIndex) {
+    return noteName(mode.intervals[degreeIndex]);
+  }
 
   const VOLUME_STORAGE_KEY = 'tonic-ear-training-volume';
   let masterVolume = 0.3;
@@ -499,7 +520,7 @@
   }
 
   function renderAnalytics(stats, container, detailed = false) {
-    const names = MODES.chromatic.names;
+    const names = NOTE_NOTATIONS[notationId];
     const questions = stats.questions;
     const mistake = mostCommonMistake(stats);
     let slowestNoteIndex = -1;
@@ -590,22 +611,81 @@
   function renderKeyboard() {
     keyboard.replaceChildren();
     keyboard.className = `keyboard ${session.modeId}`;
-    session.mode.names.forEach((name, index) => {
-      const interval = session.mode.intervals[index];
+    const choices = session.mode.intervals.map((interval, index) => ({
+      interval,
+      answerIndex: index,
+      degree: session.mode.degrees[index],
+      shortcut: index + 1,
+      high: false
+    }));
+    choices.push({ interval: 0, answerIndex: 0, degree: 'I', shortcut: choices.length + 1, high: true });
+    keyboard.style.setProperty('--key-count', String(choices.length));
+    choices.forEach((choice, buttonIndex) => {
+      const name = noteName(choice.interval, choice.high);
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `key${![0, 2, 4, 5, 7, 9, 11].includes(interval) ? ' accidental' : ''}`;
-      button.dataset.degree = index;
+      button.className = `key${![0, 2, 4, 5, 7, 9, 11].includes(choice.interval) ? ' accidental' : ''}${choice.high ? ' high-tonic' : ''}`;
+      button.dataset.answerIndex = String(choice.answerIndex);
+      button.dataset.interval = String(choice.interval);
+      button.dataset.high = String(choice.high);
       button.disabled = true;
-      button.setAttribute('aria-label', `${name}、主音から${interval}半音`);
-      button.innerHTML = `<span class="key-solfege">${name}</span><span class="key-degree">${session.mode.degrees[index]} · ${index + 1}</span>`;
-      button.addEventListener('click', () => answer(index));
+      button.setAttribute('aria-label', `${name}、主音から${choice.high ? 12 : choice.interval}半音`);
+      button.innerHTML = `<span class="key-solfege">${name}</span><span class="key-degree">${choice.degree} · ${choice.high ? '↑' : choice.shortcut}</span>`;
+      button.addEventListener('click', () => answer(buttonIndex));
       keyboard.appendChild(button);
     });
     keyButtons = [...keyboard.querySelectorAll('.key')];
-    keyboardHint.textContent = session.mode.intervals.length <= 9
-      ? `KEYS 1—${session.mode.intervals.length}`
+    keyboardHint.textContent = choices.length <= 9
+      ? `KEYS 1—${choices.length}`
       : 'CLICK / TAP';
+  }
+
+  function refreshAnswerKeyboardLabels() {
+    keyButtons.forEach((button, buttonIndex) => {
+      const interval = Number(button.dataset.interval);
+      const high = button.dataset.high === 'true';
+      const name = noteName(interval, high);
+      button.querySelector('.key-solfege').textContent = name;
+      button.setAttribute('aria-label', `${name}、主音から${high ? 12 : interval}半音`);
+      button.dataset.buttonIndex = String(buttonIndex);
+    });
+  }
+
+  function renderMelodyKeyboard() {
+    melodyKeyboard.replaceChildren();
+    melodyKeyboard.style.setProperty('--key-count', '13');
+    for (let interval = 0; interval <= 12; interval += 1) {
+      const high = interval === 12;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `key${![0, 2, 4, 5, 7, 9, 11, 12].includes(interval) ? ' accidental' : ''}${high ? ' high-tonic' : ''}`;
+      button.setAttribute('aria-label', `${noteName(interval, high)}、主音から${interval}半音`);
+      button.innerHTML = `<span class="key-solfege">${noteName(interval, high)}</span><span class="key-degree">${interval === 12 ? 'I · ↑' : `${interval} ST`}</span>`;
+      button.addEventListener('click', () => {
+        ensureAudio();
+        preparePianoSamples();
+        button.classList.add('pressed');
+        window.setTimeout(() => button.classList.remove('pressed'), 160);
+        const tonic = melodyQuestion?.tonic ?? 48;
+        scheduleTone(tonic + 12 + interval, audioContext.currentTime + 0.01, 0.55, 0.16, 'piano');
+      });
+      melodyKeyboard.appendChild(button);
+    }
+  }
+
+  function updateNotationUI() {
+    document.querySelectorAll('[data-note-interval]').forEach(label => {
+      label.textContent = noteName(Number(label.dataset.noteInterval));
+    });
+    refreshAnswerKeyboardLabels();
+    renderMelodyKeyboard();
+    if (melodyQuestion) renderMelodyQuestion();
+    if (state === 'answering' && userAnswers.length) {
+      statusCopy.textContent = userAnswers.map(answerButtonName).join(' → ');
+    }
+    if ((state === 'feedback' || state === 'reference') && currentRound) refreshFeedbackNotation();
+    if (!statsPanel.hidden) renderStats();
+    if (!resultPanel.hidden) renderAnalytics(sessionStats, sessionStatsContent);
   }
 
   function createAudioContext() {
@@ -1011,7 +1091,7 @@
 
   function melodySolfegeParts(midi, tonic, previousMidi = null) {
     return {
-      name: CHROMATIC_SOLFEGE[pitchClass(midi - tonic)],
+      name: noteName(midi - tonic),
       marker: previousMidi === null || midi === previousMidi ? '' : midi > previousMidi ? '↑' : '↓'
     };
   }
@@ -1428,7 +1508,7 @@
       drawRoundedRect(context, x, top, noteWidth, barHeight, Math.min(5, noteWidth / 3));
       context.fill();
       context.shadowBlur = 0;
-      if (event.type === 'melody' && event.label) {
+      if (event.type === 'melody') {
         const visibleTop = Math.max(0, top);
         const visibleBottom = Math.min(strikeY, bottom);
         if (visibleBottom - visibleTop >= 12) {
@@ -1436,7 +1516,7 @@
           context.font = '700 9px "Noto Sans JP", sans-serif';
           context.textAlign = 'center';
           context.textBaseline = 'middle';
-          context.fillText(event.label, x + noteWidth / 2, (visibleTop + visibleBottom) / 2);
+          context.fillText(noteName(event.interval), x + noteWidth / 2, (visibleTop + visibleBottom) / 2);
         }
       }
       if (now >= event.start && now <= event.end) activeKeys.set(event.midi, event.type);
@@ -1592,7 +1672,7 @@
         start: cursor,
         end: cursor + headDuration,
         type: 'melody',
-        label: CHROMATIC_SOLFEGE[pitchClass(notes.head - melodyQuestion.tonic)]
+        interval: pitchClass(notes.head - melodyQuestion.tonic)
       });
       if (notes.middle !== null) {
         const middleStart = cursor + chordDuration / 2;
@@ -1603,7 +1683,7 @@
           start: middleStart,
           end: middleStart + middleDuration,
           type: 'melody',
-          label: CHROMATIC_SOLFEGE[pitchClass(notes.middle - melodyQuestion.tonic)]
+          interval: pitchClass(notes.middle - melodyQuestion.tonic)
         });
       }
       cursor += chordDuration;
@@ -1725,6 +1805,7 @@
         setSequence(-1, 2);
         feedback.classList.add('visible');
         replayButton.disabled = false;
+        setKeysEnabled(true);
         referencePatternButton.hidden = false;
         referenceSpeedControl.hidden = false;
         nextButton.disabled = false;
@@ -1833,6 +1914,7 @@
     referencePatternButton.textContent = 'ド基準フレーズ';
     referencePatternButton.classList.remove('is-stop');
     referenceSpeedInput.disabled = false;
+    setKeysEnabled(true);
     liveRegion.textContent = message;
   }
 
@@ -1851,6 +1933,7 @@
     phaseText.textContent = 'ド基準フレーズ';
     nextButton.disabled = true;
     replayButton.disabled = true;
+    setKeysEnabled(false);
     referencePatternButton.disabled = false;
     referencePatternButton.textContent = '停止';
     referencePatternButton.classList.add('is-stop');
@@ -1870,6 +1953,43 @@
     });
   }
 
+  function answerDegreeIndex(buttonIndex) {
+    return Number(keyButtons[buttonIndex]?.dataset.answerIndex);
+  }
+
+  function answerButtonName(buttonIndex) {
+    const button = keyButtons[buttonIndex];
+    return noteName(Number(button.dataset.interval), button.dataset.high === 'true');
+  }
+
+  function answerButtonMidi(buttonIndex) {
+    const button = keyButtons[buttonIndex];
+    const interval = Number(button.dataset.interval);
+    return midiInRoundWindow(interval) + (button.dataset.high === 'true' ? 12 : 0);
+  }
+
+  function previewAnswerKey(buttonIndex) {
+    ensureAudio();
+    animateKey(buttonIndex);
+    scheduleTone(answerButtonMidi(buttonIndex), audioContext.currentTime + 0.01, 0.5, 0.25);
+  }
+
+  function markCorrectAnswerKeys() {
+    const correctDegrees = new Set(currentRound.degrees);
+    keyButtons.forEach(button => {
+      if (correctDegrees.has(Number(button.dataset.answerIndex))) button.classList.add('correct');
+    });
+  }
+
+  function refreshFeedbackNotation() {
+    const answerNames = userAnswers.map(answerButtonName);
+    const correctNames = currentRound.degrees.map(index => modeNoteName(session.mode, index));
+    const responseTimeText = `${(currentRound.responseSeconds || 0).toFixed(2)}秒`;
+    feedbackDetail.textContent = lastRoundCorrect
+      ? `${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`
+      : `回答：${answerNames.join(' → ')} ／ 正解：${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`;
+  }
+
   function evaluateAnswers() {
     state = 'feedback';
     clearPlayback();
@@ -1882,13 +2002,13 @@
       : Math.max(0, (performance.now() - currentRound.responseStartedAt) / 1000);
     const responseTimeText = `${currentRound.responseSeconds.toFixed(2)}秒`;
 
-    const positionResults = userAnswers.map((answerIndex, index) => answerIndex === currentRound.degrees[index]);
+    const positionResults = userAnswers.map((buttonIndex, index) => answerDegreeIndex(buttonIndex) === currentRound.degrees[index]);
     const correct = positionResults.every(Boolean);
     lastRoundCorrect = correct;
     currentRound.intervals.forEach((interval, index) => {
       recordAnswer(
         interval,
-        session.mode.intervals[userAnswers[index]],
+        session.mode.intervals[answerDegreeIndex(userAnswers[index])],
         positionResults[index],
         currentRound.keyIndex,
         currentRound.responseSeconds
@@ -1896,15 +2016,15 @@
     });
     recordQuestion(correct, currentRound.playCount, currentRound.responseSeconds);
 
-    const answerNames = userAnswers.map(index => session.mode.names[index]);
-    const correctNames = currentRound.degrees.map(index => session.mode.names[index]);
-    const selectedMidis = userAnswers.map(index => midiInRoundWindow(session.mode.intervals[index]));
+    const answerNames = userAnswers.map(answerButtonName);
+    const correctNames = currentRound.degrees.map(index => modeNoteName(session.mode, index));
+    const selectedMidis = userAnswers.map(answerButtonMidi);
     const correctDegreeSet = new Set(currentRound.degrees);
 
-    userAnswers.forEach((answerIndex, index) => {
-      if (!positionResults[index] && !correctDegreeSet.has(answerIndex)) keyButtons[answerIndex].classList.add('wrong');
+    userAnswers.forEach((buttonIndex, index) => {
+      if (!positionResults[index] && !correctDegreeSet.has(answerDegreeIndex(buttonIndex))) keyButtons[buttonIndex].classList.add('wrong');
     });
-    currentRound.degrees.forEach(index => keyButtons[index].classList.add('correct'));
+    markCorrectAnswerKeys();
 
     ensureAudio();
     const now = audioContext.currentTime + 0.03;
@@ -1913,8 +2033,8 @@
       score += 1;
       streak += 1;
       if (isSingleNote) {
-        scheduleTone(currentRound.targetMidis[0], now, 0.5, 0.25);
-        scheduleTonicResolution(currentRound.intervals[0], currentRound.targetMidis[0], now + 0.65);
+        scheduleTone(selectedMidis[0], now, 0.5, 0.25);
+        scheduleTonicResolution(currentRound.intervals[0], selectedMidis[0], now + 0.65);
       } else {
         scheduleSequence(selectedMidis, now);
       }
@@ -1950,6 +2070,7 @@
     nextButton.textContent = attempts >= session.total ? '結果を見る →' : '次の問題へ →';
     nextButton.disabled = false;
     replayButton.disabled = false;
+    setKeysEnabled(true);
     clearAnswerButton.hidden = true;
     referencePatternButton.hidden = false;
     referenceSpeedControl.hidden = false;
@@ -1957,14 +2078,19 @@
   }
 
   function answer(index) {
-    if (state !== 'answering' || !currentRound) return;
+    if (!currentRound) return;
+    if (state === 'feedback') {
+      previewAnswerKey(index);
+      return;
+    }
+    if (state !== 'answering') return;
     animateKey(index);
     userAnswers.push(index);
     if (userAnswers.length < session.sequenceLength) {
       ensureAudio();
-      scheduleTone(midiInRoundWindow(session.mode.intervals[index]), audioContext.currentTime + 0.01, 0.28, 0.22);
+      scheduleTone(answerButtonMidi(index), audioContext.currentTime + 0.01, 0.28, 0.22);
       headline.textContent = `${userAnswers.length} / ${session.sequenceLength}`;
-      statusCopy.textContent = userAnswers.map(answerIndex => session.mode.names[answerIndex]).join(' → ');
+      statusCopy.textContent = userAnswers.map(answerButtonName).join(' → ');
       clearAnswerButton.disabled = false;
       liveRegion.textContent = `${userAnswers.length}音目を入力しました。`;
       return;
@@ -2099,6 +2225,7 @@
   updateExcludeOptions();
   updateRange('minimum');
   updateFixedKeyChoice();
+  updateNotationUI();
 
   settingsForm.addEventListener('submit', async event => {
     event.preventDefault();
@@ -2198,6 +2325,12 @@
     try { localStorage.setItem(VOLUME_STORAGE_KEY, String(masterVolume)); } catch (_) {}
   });
 
+  notationSelect.addEventListener('change', () => {
+    notationId = NOTE_NOTATIONS[notationSelect.value] ? notationSelect.value : 'sharp';
+    try { localStorage.setItem(NOTATION_STORAGE_KEY, notationId); } catch (_) {}
+    updateNotationUI();
+  });
+
   referenceSpeedInput.addEventListener('input', () => {
     referenceNoteSeconds = Number(referenceSpeedInput.value);
     referenceSpeedValue.textContent = `${referenceNoteSeconds.toFixed(2)}秒`;
@@ -2272,7 +2405,7 @@
   });
 
   document.addEventListener('keydown', event => {
-    if (event.repeat || state !== 'answering') return;
+    if (event.repeat || !['answering', 'feedback'].includes(state)) return;
     const number = Number(event.key);
     if (number >= 1 && number <= Math.min(9, keyButtons.length)) {
       event.preventDefault();
