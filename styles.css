@@ -295,6 +295,32 @@ main {
 .sequence-options { grid-template-columns: repeat(3, 1fr); }
 .timbre-options { grid-template-columns: repeat(2, 1fr); }
 
+.interval-filter {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.interval-filter p { margin: 0 0 10px; font-size: 12px; font-weight: 700; }
+.interval-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.interval-options label { position: relative; cursor: pointer; }
+.interval-options input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.interval-options span {
+  display: grid;
+  min-height: 38px;
+  padding: 5px 8px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+.interval-options input:checked + span { border-color: var(--ink); background: var(--mint); box-shadow: 2px 2px 0 var(--ink); }
+.interval-options input:focus-visible + span { outline: 3px solid var(--mint); outline-offset: 2px; }
+
 .mode-options { display: grid; gap: 8px; }
 
 .option { position: relative; }
@@ -936,6 +962,7 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
   .setting-group { margin-bottom: 25px; }
   .exclude-grid { grid-template-columns: repeat(4, 1fr); }
   .count-option label { min-height: 54px; }
+  .interval-options { grid-template-columns: repeat(2, 1fr); }
   .mode-option label { min-height: 65px; padding: 11px 13px; }
   .setup-actions { grid-template-columns: 1fr; }
   .setup-actions .secondary { min-height: 46px; }

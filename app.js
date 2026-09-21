@@ -25,6 +25,14 @@
     { key: 'm', code: 'KeyM', interval: 11, finger: '薬' },
     { key: ',', code: 'Comma', interval: 12, high: true, finger: '小' }
   ];
+  const TWO_NOTE_INTERVAL_GROUPS = {
+    second: [1, 2],
+    third: [3, 4],
+    fourth: [5, 6],
+    fifth: [6, 7],
+    sixth: [8, 9],
+    seventh: [10, 11]
+  };
   const MODES = {
     pentatonic: {
       label: 'ペンタトニック',
@@ -188,6 +196,8 @@
   const settingsForm = document.querySelector('#settingsForm');
   const setupSubmitButton = settingsForm.querySelector('.setup-submit');
   const noteModeInputs = [...settingsForm.querySelectorAll('input[name="noteMode"]')];
+  const sequenceLengthInputs = [...settingsForm.querySelectorAll('input[name="sequenceLength"]')];
+  const twoNoteIntervalOptions = document.querySelector('#twoNoteIntervalOptions');
   const excludeNoteInputs = [...settingsForm.querySelectorAll('input[name="excludeNote"]')];
   const rangeMinInput = document.querySelector('#rangeMin');
   const rangeMaxInput = document.querySelector('#rangeMax');
@@ -310,6 +320,8 @@
     excludedIntervals: [],
     rangeMin: 36,
     rangeMax: 95,
+    allowedTwoNoteDistances: Object.values(TWO_NOTE_INTERVAL_GROUPS).flat(),
+    keyIndices: Array.from({ length: KEYS.length }, (_, index) => index),
     keyRepeatCount: 1,
     fixedKeyIndex: null,
     preQuestionReference: false,
@@ -1237,7 +1249,7 @@
 
   function drawNewKeyIndex() {
     if (!keyBag.length) {
-      keyBag = shuffled(Array.from({ length: KEYS.length }, (_, index) => index));
+      keyBag = shuffled(session.keyIndices || Array.from({ length: KEYS.length }, (_, index) => index));
       if (keyBag[0] === previousKeyIndex && keyBag.length > 1) {
         const swapIndex = 1 + randomIndex(keyBag.length - 1);
         [keyBag[0], keyBag[swapIndex]] = [keyBag[swapIndex], keyBag[0]];
@@ -1290,6 +1302,32 @@
     return selected;
   }
 
+  function hasAllowedTwoNotePair(degrees, mode, allowedDistances) {
+    const allowed = new Set(allowedDistances);
+    return degrees.some((first, firstIndex) => degrees.some((second, secondIndex) => (
+      firstIndex !== secondIndex
+      && allowed.has(Math.abs(mode.intervals[first] - mode.intervals[second]))
+    )));
+  }
+
+  function findTonicCandidates(key, config, eligibleDegrees) {
+    const candidates = [];
+    for (let tonicMidi = config.rangeMin - 11; tonicMidi <= config.rangeMax; tonicMidi += 1) {
+      if (pitchClass(tonicMidi) !== pitchClass(key.midi)) continue;
+      const degreesInRange = eligibleDegrees.filter(degree => {
+        const midi = tonicMidi + config.mode.intervals[degree];
+        return midi >= config.rangeMin && midi <= config.rangeMax;
+      });
+      const viable = config.sequenceLength === 1
+        ? degreesInRange.length >= 1
+        : config.sequenceLength === 2
+          ? hasAllowedTwoNotePair(degreesInRange, config.mode, config.allowedTwoNoteDistances)
+          : degreesInRange.length >= config.sequenceLength;
+      if (viable) candidates.push({ tonicMidi, degreesInRange });
+    }
+    return candidates;
+  }
+
   function buildRound() {
     const keyIndex = drawKeyIndex();
     const key = KEYS[keyIndex];
@@ -1298,22 +1336,31 @@
       .map((interval, index) => ({ interval, index }))
       .filter(choice => !excludedIntervals.has(choice.interval))
       .map(choice => choice.index);
-    const tonicCandidates = [];
-    for (let tonicMidi = session.rangeMin - 11; tonicMidi <= session.rangeMax; tonicMidi += 1) {
-      if (pitchClass(tonicMidi) !== pitchClass(key.midi)) continue;
-      const degreesInRange = eligibleDegrees.filter(degree => {
-        const midi = tonicMidi + session.mode.intervals[degree];
-        return midi >= session.rangeMin && midi <= session.rangeMax;
-      });
-      if (degreesInRange.length) tonicCandidates.push({ tonicMidi, degreesInRange });
-    }
+    const tonicCandidates = findTonicCandidates(key, session, eligibleDegrees);
     const maximumChoiceCount = Math.max(...tonicCandidates.map(candidate => candidate.degreesInRange.length));
     const widestCandidates = tonicCandidates.filter(candidate => candidate.degreesInRange.length === maximumChoiceCount);
     const selectedTonic = widestCandidates[randomIndex(widestCandidates.length)];
-    const degrees = Array.from(
-      { length: session.sequenceLength },
-      () => drawDegree(selectedTonic.degreesInRange)
-    );
+    const degrees = [];
+    if (session.sequenceLength === 2) {
+      const allowedDistances = new Set(session.allowedTwoNoteDistances);
+      const firstChoices = selectedTonic.degreesInRange.filter(first => selectedTonic.degreesInRange.some(second => (
+        first !== second
+        && allowedDistances.has(Math.abs(session.mode.intervals[first] - session.mode.intervals[second]))
+      )));
+      const first = drawDegree(firstChoices);
+      const secondChoices = selectedTonic.degreesInRange.filter(second => (
+        second !== first
+        && allowedDistances.has(Math.abs(session.mode.intervals[first] - session.mode.intervals[second]))
+      ));
+      degrees.push(first, drawDegree(secondChoices));
+    } else {
+      const remainingDegrees = [...selectedTonic.degreesInRange];
+      for (let index = 0; index < session.sequenceLength; index += 1) {
+        const degree = drawDegree(remainingDegrees);
+        degrees.push(degree);
+        remainingDegrees.splice(remainingDegrees.indexOf(degree), 1);
+      }
+    }
     const intervals = degrees.map(degree => session.mode.intervals[degree]);
     const targetMidis = intervals.map(interval => selectedTonic.tonicMidi + interval);
     return {
@@ -2259,13 +2306,20 @@
     fixedKeyChoiceRow.hidden = keyRepeatCountInput.value !== 'all';
   }
 
+  function updateTwoNoteIntervalOptions() {
+    const sequenceLength = Number(sequenceLengthInputs.find(input => input.checked)?.value || 1);
+    twoNoteIntervalOptions.hidden = sequenceLength !== 2;
+  }
+
   noteModeInputs.forEach(input => input.addEventListener('change', updateExcludeOptions));
+  sequenceLengthInputs.forEach(input => input.addEventListener('change', updateTwoNoteIntervalOptions));
   rangeMinInput.addEventListener('input', () => updateRange('minimum'));
   rangeMaxInput.addEventListener('input', () => updateRange('maximum'));
   keyRepeatCountInput.addEventListener('change', updateFixedKeyChoice);
   updateExcludeOptions();
   updateRange('minimum');
   updateFixedKeyChoice();
+  updateTwoNoteIntervalOptions();
   updateNotationUI();
 
   settingsForm.addEventListener('submit', async event => {
@@ -2275,29 +2329,58 @@
     const keyRepeatValue = data.get('keyRepeatCount');
     const fixedKeyChoice = data.get('fixedKeyChoice');
     const progressionId = data.get('chordProgression');
+    const sequenceLength = Number(data.get('sequenceLength'));
     const excludedIntervals = data.getAll('excludeNote').map(Number);
     const availableIntervals = MODES[modeId].intervals.filter(interval => !excludedIntervals.includes(interval));
-    if (!availableIntervals.length) {
-      window.alert('出題する音を1つ以上残してください。');
+    if (availableIntervals.length < sequenceLength) {
+      window.alert(`${sequenceLength}音以上、出題する音を残してください。`);
       return;
     }
-    session = {
+    const selectedIntervalGroups = data.getAll('twoNoteInterval');
+    const allowedTwoNoteDistances = [...new Set(selectedIntervalGroups.flatMap(group => TWO_NOTE_INTERVAL_GROUPS[group] || []))];
+    if (sequenceLength === 2 && !allowedTwoNoteDistances.length) {
+      window.alert('2音の音程差を1つ以上選んでください。');
+      return;
+    }
+    const eligibleDegrees = MODES[modeId].intervals
+      .map((interval, index) => ({ interval, index }))
+      .filter(choice => !excludedIntervals.includes(choice.interval))
+      .map(choice => choice.index);
+    if (sequenceLength === 2 && !hasAllowedTwoNotePair(eligibleDegrees, MODES[modeId], allowedTwoNoteDistances)) {
+      window.alert('選択した音と音程差では2音の組み合わせを作れません。');
+      return;
+    }
+    const requestedFixedKeyIndex = keyRepeatValue === 'all' && fixedKeyChoice !== 'random'
+      ? Number(fixedKeyChoice)
+      : null;
+    const nextSession = {
       total: Number(data.get('questionCount')),
       modeId,
       mode: MODES[modeId],
-      sequenceLength: Number(data.get('sequenceLength')),
+      sequenceLength,
       timbre: data.get('timbre'),
       excludedIntervals,
       rangeMin: Number(data.get('rangeMin')),
       rangeMax: Number(data.get('rangeMax')),
+      allowedTwoNoteDistances,
       keyRepeatCount: keyRepeatValue === 'all' ? Infinity : Number(keyRepeatValue),
-      fixedKeyIndex: keyRepeatValue === 'all' && fixedKeyChoice !== 'random'
-        ? Number(fixedKeyChoice)
-        : null,
+      fixedKeyIndex: requestedFixedKeyIndex,
       preQuestionReference: data.has('preQuestionReference'),
       progressionId,
       progression: CHORD_PROGRESSIONS[progressionId] || CHORD_PROGRESSIONS.basic
     };
+    nextSession.keyIndices = KEYS
+      .map((key, index) => findTonicCandidates(key, nextSession, eligibleDegrees).length ? index : null)
+      .filter(index => index !== null);
+    if (!nextSession.keyIndices.length) {
+      window.alert('現在の音域では、この設定の問題を作れません。');
+      return;
+    }
+    if (requestedFixedKeyIndex !== null && !nextSession.keyIndices.includes(requestedFixedKeyIndex)) {
+      window.alert('選択した調と音域では、この設定の問題を作れません。');
+      return;
+    }
+    session = nextSession;
     foundationStepLabel.textContent = session.preQuestionReference
       ? `ド基準 → ${session.progression.label}`
       : session.progression.label;
