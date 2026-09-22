@@ -351,6 +351,7 @@
   const chordTypingScore = document.querySelector('#chordTypingScore');
   const chordTypingStage = document.querySelector('#chordTypingStage');
   const chordTypingSymbol = document.querySelector('#chordTypingSymbol');
+  const chordTypingTones = document.querySelector('#chordTypingTones');
   const chordTypingEntry = document.querySelector('#chordTypingEntry');
   const chordTypingBuffer = document.querySelector('#chordTypingBuffer');
   const chordTypingCapture = document.querySelector('#chordTypingCapture');
@@ -439,7 +440,14 @@
   let melodyAnimationFrame = null;
   let melodyVisualizerState = null;
   let chordTypingState = 'setup';
-  let chordTypingSession = { total: 10, mode: 'triad', inputMode: 'solfege', round: 0, score: 0 };
+  let chordTypingSession = {
+    total: 10,
+    mode: 'triad',
+    inputMode: 'solfege',
+    showTones: false,
+    round: 0,
+    score: 0
+  };
   let chordTypingQuestion = null;
   let chordTypingBag = [];
   let chordTypingEntries = [];
@@ -1972,6 +1980,7 @@
     if (chordTypingSession.round > chordTypingSession.total) {
       chordTypingState = 'complete';
       chordTypingSymbol.textContent = `${chordTypingSession.score}/${chordTypingSession.total}`;
+      chordTypingTones.hidden = true;
       chordTypingFeedback.textContent = '終了';
       chordTypingEntry.replaceChildren();
       chordTypingBuffer.textContent = '';
@@ -1990,6 +1999,8 @@
     chordTypingRound.textContent = String(chordTypingSession.round);
     chordTypingScore.textContent = String(chordTypingSession.score);
     chordTypingSymbol.textContent = chordTypingQuestion.symbol;
+    chordTypingTones.textContent = chordTypingAnswerText();
+    chordTypingTones.hidden = !chordTypingSession.showTones;
     chordTypingFeedback.textContent = '';
     chordTypingClearButton.hidden = false;
     chordTypingNextButton.hidden = true;
@@ -2827,6 +2838,7 @@
       total: Number(data.get('chordQuestionCount')),
       mode,
       inputMode: data.get('chordInputMode'),
+      showTones: data.get('chordToneDisplay') === 'shown',
       round: 0,
       score: 0
     };

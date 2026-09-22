@@ -986,6 +986,7 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 
 .chord-typing-stage .eyebrow { margin-bottom: 20px; }
 .chord-typing-symbol { max-width: none; font: 600 clamp(58px, 10vw, 112px)/1 "DM Mono", monospace; letter-spacing: -0.07em; }
+.chord-typing-tones { margin: 10px 0 0; color: rgba(23, 22, 20, 0.62); font: 600 15px/1.4 "DM Mono", monospace; letter-spacing: 0.08em; }
 
 .chord-typing-entry {
   display: flex;

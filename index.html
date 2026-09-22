@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260922-3">
+  <link rel="stylesheet" href="styles.css?v=20260922-4">
 </head>
 <body>
   <div class="shell">
@@ -356,6 +356,13 @@
               <label><input type="radio" name="chordInputMode" value="letter"><span>C D E</span></label>
             </div>
           </fieldset>
+          <fieldset class="setting-group">
+            <legend><span class="setting-index">04</span>構成音</legend>
+            <div class="chord-mode-options chord-input-mode-options">
+              <label><input type="radio" name="chordToneDisplay" value="hidden" checked><span>表示しない</span></label>
+              <label><input type="radio" name="chordToneDisplay" value="shown"><span>表示する</span></label>
+            </div>
+          </fieldset>
           <button class="primary" type="submit">始める →</button>
         </form>
       </section>
@@ -369,6 +376,7 @@
         <div class="chord-typing-stage" id="chordTypingStage">
           <p class="eyebrow">CHORD</p>
           <h1 class="chord-typing-symbol" id="chordTypingSymbol">CM7</h1>
+          <p class="chord-typing-tones" id="chordTypingTones" hidden></p>
           <div class="chord-typing-entry" id="chordTypingEntry" aria-live="polite"></div>
           <div class="chord-typing-buffer"><span id="chordTypingBuffer"></span><i></i></div>
           <input class="chord-typing-capture" id="chordTypingCapture" type="text" inputmode="latin" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="音名をローマ字で入力">
@@ -388,11 +396,11 @@
         </div>
       </section>
     </main>
-    <footer class="site-version">Version 1.8</footer>
+    <footer class="site-version">Version 1.9</footer>
     <p class="sr-only" id="liveRegion" aria-live="assertive"></p>
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260922-4"></script>
+  <script src="app.js?v=20260922-5"></script>
 </body>
 </html>
