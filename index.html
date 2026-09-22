@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260922-2">
+  <link rel="stylesheet" href="styles.css?v=20260922-3">
 </head>
 <body>
   <div class="shell">
@@ -349,6 +349,13 @@
               <label><input type="radio" name="chordTypingMode" value="all"><span>すべて</span></label>
             </div>
           </fieldset>
+          <fieldset class="setting-group">
+            <legend><span class="setting-index">03</span>入力</legend>
+            <div class="chord-mode-options chord-input-mode-options">
+              <label><input type="radio" name="chordInputMode" value="solfege" checked><span>do re mi</span></label>
+              <label><input type="radio" name="chordInputMode" value="letter"><span>C D E</span></label>
+            </div>
+          </fieldset>
           <button class="primary" type="submit">始める →</button>
         </form>
       </section>
@@ -371,17 +378,21 @@
             <button class="primary" id="chordTypingNextButton" type="button" hidden>次へ →</button>
           </div>
         </div>
-        <div class="chord-typing-guide" aria-label="入力する音名">
+        <div class="chord-typing-guide" id="chordTypingSolfegeGuide" aria-label="入力する音名">
           <span>do</span><span>di</span><span>re</span><span>me</span><span>mi</span><span>fa</span>
           <span>fi</span><span>so</span><span>swi</span><span>ra</span><span>ri</span><span>si / shi</span>
         </div>
+        <div class="chord-typing-guide chord-letter-guide" id="chordTypingLetterGuide" aria-label="英語音名の入力方法" hidden>
+          <span>C</span><span>D</span><span>E</span><span>F</span><span>G</span><span>A</span><span>B</span>
+          <span>Shift + 音 = ♯</span><span>Ctrl + 音 = ♭</span><span>Space = 確定</span>
+        </div>
       </section>
     </main>
-    <footer class="site-version">Version 1.7</footer>
+    <footer class="site-version">Version 1.8</footer>
     <p class="sr-only" id="liveRegion" aria-live="assertive"></p>
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260922-3"></script>
+  <script src="app.js?v=20260922-4"></script>
 </body>
 </html>

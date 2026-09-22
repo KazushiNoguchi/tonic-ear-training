@@ -963,6 +963,7 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 }
 .chord-mode-options input:checked + span { border-color: var(--ink); background: var(--mint); box-shadow: 3px 3px 0 var(--ink); }
 .chord-mode-options input:focus-visible + span { outline: 3px solid var(--mint); outline-offset: 2px; }
+.chord-input-mode-options label:last-child { grid-column: auto; }
 
 .chord-typing-topbar {
   display: flex;
@@ -1046,6 +1047,10 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
 }
 .chord-typing-guide span { padding: 15px 4px; border-right: 1px solid var(--line); text-align: center; font: 500 11px/1 "DM Mono", monospace; }
 .chord-typing-guide span:last-child { border-right: 0; }
+.chord-letter-guide { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.chord-letter-guide span:nth-child(7) { border-right: 0; }
+.chord-letter-guide span:nth-child(n + 8) { grid-column: span 2; border-top: 1px solid var(--line); }
+.chord-letter-guide span:last-child { grid-column: span 3; }
 
 .sr-only {
   position: absolute;
@@ -1146,6 +1151,11 @@ button:disabled { cursor: not-allowed; opacity: 0.38; }
   .chord-typing-guide { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .chord-typing-guide span:nth-child(6) { border-right: 0; }
   .chord-typing-guide span:nth-child(-n + 6) { border-bottom: 1px solid var(--line); }
+  .chord-letter-guide { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .chord-letter-guide span:nth-child(6) { border-right: 1px solid var(--line); }
+  .chord-letter-guide span:nth-child(-n + 6) { border-bottom: 0; }
+  .chord-letter-guide span:nth-child(7) { border-right: 0; }
+  .chord-letter-guide span:nth-child(n + 8) { border-top: 1px solid var(--line); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -194,6 +194,7 @@
     { text: 'si', pitchClass: 11, label: 'シ' },
     { text: 'shi', pitchClass: 11, label: 'シ' }
   ];
+  const CHORD_LETTER_PITCH_CLASSES = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
   const CHORD_TYPING_DEFINITIONS = [
     { category: 'triad', suffix: '', intervals: [0, 4, 7] },
     { category: 'triad', suffix: 'm', intervals: [0, 3, 7] },
@@ -356,6 +357,8 @@
   const chordTypingFeedback = document.querySelector('#chordTypingFeedback');
   const chordTypingClearButton = document.querySelector('#chordTypingClearButton');
   const chordTypingNextButton = document.querySelector('#chordTypingNextButton');
+  const chordTypingSolfegeGuide = document.querySelector('#chordTypingSolfegeGuide');
+  const chordTypingLetterGuide = document.querySelector('#chordTypingLetterGuide');
 
   function appendSelectOption(select, value, label) {
     const option = document.createElement('option');
@@ -436,11 +439,12 @@
   let melodyAnimationFrame = null;
   let melodyVisualizerState = null;
   let chordTypingState = 'setup';
-  let chordTypingSession = { total: 10, mode: 'triad', round: 0, score: 0 };
+  let chordTypingSession = { total: 10, mode: 'triad', inputMode: 'solfege', round: 0, score: 0 };
   let chordTypingQuestion = null;
   let chordTypingBag = [];
   let chordTypingEntries = [];
   let chordTypingPending = '';
+  let chordTypingPendingToken = null;
 
   const NOTATION_STORAGE_KEY = 'tonic-ear-training-notation';
   let notationId = 'sharp';
@@ -1916,6 +1920,28 @@
     return CHORD_TYPING_TOKENS.find(token => token.pitchClass === pitchClass(value));
   }
 
+  function chordTypingAnswerText() {
+    return chordTypingQuestion.tones.map(tone => chordTypingSession.inputMode === 'letter'
+      ? CHORD_ROOT_NAMES[pitchClass(tone)]
+      : tokenForPitchClass(tone).text).join(' · ');
+  }
+
+  function revalidateChordTypingEntries() {
+    const accepted = new Set();
+    chordTypingEntries.forEach(entry => {
+      entry.valid = chordTypingQuestion.tones.includes(entry.token.pitchClass)
+        && !accepted.has(entry.token.pitchClass);
+      if (entry.valid) accepted.add(entry.token.pitchClass);
+    });
+  }
+
+  function hasAllChordTones() {
+    const accepted = new Set(chordTypingEntries
+      .filter(entry => entry.valid)
+      .map(entry => entry.token.pitchClass));
+    return chordTypingQuestion.tones.every(tone => accepted.has(tone));
+  }
+
   function renderChordTypingEntries() {
     chordTypingEntry.replaceChildren();
     chordTypingEntries.forEach(entry => {
@@ -1927,7 +1953,7 @@
       chip.appendChild(label);
       chordTypingEntry.appendChild(chip);
     });
-    chordTypingBuffer.textContent = chordTypingPending;
+    chordTypingBuffer.textContent = chordTypingPendingToken?.text || chordTypingPending;
   }
 
   function refillChordTypingBag() {
@@ -1959,6 +1985,7 @@
     chordTypingQuestion = chordTypingBag.pop();
     chordTypingEntries = [];
     chordTypingPending = '';
+    chordTypingPendingToken = null;
     chordTypingState = 'answering';
     chordTypingRound.textContent = String(chordTypingSession.round);
     chordTypingScore.textContent = String(chordTypingSession.score);
@@ -1981,6 +2008,10 @@
     chordTypingScore.textContent = '0';
     chordTypingSetup.hidden = true;
     chordTypingPlay.hidden = false;
+    const letterMode = chordTypingSession.inputMode === 'letter';
+    chordTypingSolfegeGuide.hidden = letterMode;
+    chordTypingLetterGuide.hidden = !letterMode;
+    chordTypingCapture.setAttribute('aria-label', letterMode ? '英語音名を入力' : '音名をローマ字で入力');
     nextChordTypingQuestion();
   }
 
@@ -1988,15 +2019,13 @@
     chordTypingState = 'setup';
     chordTypingEntries = [];
     chordTypingPending = '';
+    chordTypingPendingToken = null;
     chordTypingSetup.hidden = false;
     chordTypingPlay.hidden = true;
   }
 
   function evaluateChordTypingAnswer() {
-    const entered = chordTypingEntries.map(entry => entry.token.pitchClass);
-    const correct = entered.length === chordTypingQuestion.tones.length
-      && new Set(entered).size === entered.length
-      && chordTypingQuestion.tones.every(tone => entered.includes(tone));
+    const correct = chordTypingEntries.every(entry => entry.valid);
     chordTypingState = 'feedback';
     chordTypingCapture.disabled = true;
     chordTypingClearButton.hidden = true;
@@ -2007,21 +2036,21 @@
       chordTypingScore.textContent = String(chordTypingSession.score);
       chordTypingFeedback.textContent = '正解';
     } else {
-      const answer = chordTypingQuestion.tones.map(tone => tokenForPitchClass(tone).text).join(' · ');
-      chordTypingFeedback.textContent = `正解：${answer}`;
+      chordTypingFeedback.textContent = `正解：${chordTypingAnswerText()}`;
     }
     chordTypingNextButton.focus();
   }
 
-  function acceptChordTypingToken(token) {
-    const alreadyEntered = chordTypingEntries.some(entry => entry.token.pitchClass === token.pitchClass);
+  function acceptChordTypingToken(token, allowFinish = true) {
+    const alreadyEntered = chordTypingEntries.some(entry => entry.valid && entry.token.pitchClass === token.pitchClass);
     chordTypingEntries.push({
       token,
       valid: chordTypingQuestion.tones.includes(token.pitchClass) && !alreadyEntered
     });
     chordTypingPending = '';
+    chordTypingPendingToken = null;
     renderChordTypingEntries();
-    if (chordTypingEntries.length >= chordTypingQuestion.tones.length) evaluateChordTypingAnswer();
+    if (allowFinish && hasAllChordTones()) evaluateChordTypingAnswer();
   }
 
   function handleChordTypingCharacter(character) {
@@ -2039,6 +2068,29 @@
       chordTypingPending = '';
     }
     renderChordTypingEntries();
+  }
+
+  function makeChordLetterToken(character, useSharp, useFlat) {
+    const base = CHORD_LETTER_PITCH_CLASSES[character];
+    const offset = useSharp ? 1 : useFlat ? -1 : 0;
+    const accidental = useSharp ? '♯' : useFlat ? '♭' : '';
+    const tokenPitchClass = pitchClass(base + offset);
+    return {
+      text: `${character.toUpperCase()}${accidental}`,
+      pitchClass: tokenPitchClass,
+      label: noteName(tokenPitchClass)
+    };
+  }
+
+  function handleChordTypingLetter(character, useSharp = false, useFlat = false) {
+    if (chordTypingPendingToken) acceptChordTypingToken(chordTypingPendingToken, false);
+    chordTypingPendingToken = makeChordLetterToken(character, useSharp, useFlat);
+    renderChordTypingEntries();
+  }
+
+  function confirmChordTypingLetter() {
+    if (!chordTypingPendingToken) return;
+    acceptChordTypingToken(chordTypingPendingToken);
   }
 
   function showTrainingView(view) {
@@ -2774,6 +2826,7 @@
     chordTypingSession = {
       total: Number(data.get('chordQuestionCount')),
       mode,
+      inputMode: data.get('chordInputMode'),
       round: 0,
       score: 0
     };
@@ -2786,6 +2839,7 @@
     if (chordTypingState !== 'answering') return;
     chordTypingEntries = [];
     chordTypingPending = '';
+    chordTypingPendingToken = null;
     renderChordTypingEntries();
     chordTypingCapture.focus();
   });
@@ -2804,15 +2858,21 @@
       chordTypingCapture.value = '';
       return;
     }
-    const characters = chordTypingCapture.value.toLowerCase().replace(/[^a-z]/g, '');
+    const characters = chordTypingCapture.value.toLowerCase();
     chordTypingCapture.value = '';
     [...characters].forEach(character => {
-      if (chordTypingState === 'answering') handleChordTypingCharacter(character);
+      if (chordTypingState !== 'answering') return;
+      if (chordTypingSession.inputMode === 'letter') {
+        if (/^[a-g]$/.test(character)) handleChordTypingLetter(character);
+        else if (character === ' ') confirmChordTypingLetter();
+      } else if (/^[a-z]$/.test(character)) {
+        handleChordTypingCharacter(character);
+      }
     });
   });
 
   document.addEventListener('keydown', event => {
-    if (event.repeat || event.ctrlKey || event.altKey || event.metaKey) return;
+    if (event.repeat || event.altKey || event.metaKey) return;
     if (!chordTypingGame.hidden) {
       if (event.key === 'Enter' && ['feedback', 'complete'].includes(chordTypingState)) {
         event.preventDefault();
@@ -2822,18 +2882,31 @@
       if (chordTypingState !== 'answering') return;
       if (event.key === 'Backspace') {
         event.preventDefault();
-        if (chordTypingPending) chordTypingPending = chordTypingPending.slice(0, -1);
-        else chordTypingEntries.pop();
+        if (chordTypingPendingToken) chordTypingPendingToken = null;
+        else if (chordTypingPending) chordTypingPending = chordTypingPending.slice(0, -1);
+        else {
+          chordTypingEntries.pop();
+          revalidateChordTypingEntries();
+        }
         renderChordTypingEntries();
         return;
       }
       const character = event.key.length === 1 ? event.key.toLowerCase() : '';
-      if (/^[a-z]$/.test(character)) {
+      if (chordTypingSession.inputMode === 'letter') {
+        if (event.code === 'Space') {
+          event.preventDefault();
+          confirmChordTypingLetter();
+        } else if (/^[a-g]$/.test(character)) {
+          event.preventDefault();
+          handleChordTypingLetter(character, event.shiftKey, event.ctrlKey);
+        }
+      } else if (!event.ctrlKey && /^[a-z]$/.test(character)) {
         event.preventDefault();
         handleChordTypingCharacter(character);
       }
       return;
     }
+    if (event.ctrlKey) return;
     const pressedKey = event.key.length === 1 ? event.key.toLowerCase() : '';
     const pianoBinding = PIANO_KEY_BINDINGS.find(binding => binding.code === event.code || binding.key === pressedKey);
     if (pianoBinding) {
