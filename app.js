@@ -188,9 +188,10 @@
     { text: 'fa', pitchClass: 5, label: 'ファ' },
     { text: 'fi', pitchClass: 6, label: 'フィ' },
     { text: 'so', pitchClass: 7, label: 'ソ' },
-    { text: 'si', pitchClass: 8, label: 'スィ' },
+    { text: 'swi', pitchClass: 8, label: 'スィ' },
     { text: 'ra', pitchClass: 9, label: 'ラ' },
     { text: 'ri', pitchClass: 10, label: 'リ' },
+    { text: 'si', pitchClass: 11, label: 'シ' },
     { text: 'shi', pitchClass: 11, label: 'シ' }
   ];
   const CHORD_TYPING_DEFINITIONS = [
