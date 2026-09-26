@@ -1415,8 +1415,22 @@
     const allowed = new Set(allowedDistances);
     return degrees.some((first, firstIndex) => degrees.some((second, secondIndex) => (
       firstIndex !== secondIndex
-      && allowed.has(Math.abs(mode.intervals[first] - mode.intervals[second]))
+      && allowed.has(Math.min(
+        Math.abs(mode.intervals[first] - mode.intervals[second]),
+        12 - Math.abs(mode.intervals[first] - mode.intervals[second])
+      ))
     )));
+  }
+
+  function buildTwoNotePitchPairs(tonicMidi, degrees, mode, allowedDistances, minimum, maximum) {
+    const allowed = new Set(allowedDistances);
+    const notes = degrees.flatMap(degree => {
+      const notePitchClass = pitchClass(tonicMidi + mode.intervals[degree]);
+      return pitchesInRange(minimum, maximum, [notePitchClass]).map(midi => ({ degree, midi }));
+    });
+    return notes.flatMap(first => notes
+      .filter(second => second.degree !== first.degree && allowed.has(Math.abs(second.midi - first.midi)))
+      .map(second => ({ first, second })));
   }
 
   function findTonicCandidates(key, config, eligibleDegrees) {
@@ -1427,12 +1441,29 @@
         const midi = tonicMidi + config.mode.intervals[degree];
         return midi >= config.rangeMin && midi <= config.rangeMax;
       });
+      const twoNoteDegrees = config.sequenceLength === 2
+        ? eligibleDegrees.filter(degree => pitchesInRange(
+          config.rangeMin,
+          config.rangeMax,
+          [pitchClass(tonicMidi + config.mode.intervals[degree])]
+        ).length > 0)
+        : degreesInRange;
       const viable = config.sequenceLength === 1
         ? degreesInRange.length >= 1
         : config.sequenceLength === 2
-          ? hasAllowedTwoNotePair(degreesInRange, config.mode, config.allowedTwoNoteDistances)
+          ? buildTwoNotePitchPairs(
+            tonicMidi,
+            twoNoteDegrees,
+            config.mode,
+            config.allowedTwoNoteDistances,
+            config.rangeMin,
+            config.rangeMax
+          ).length > 0
           : degreesInRange.length >= config.sequenceLength;
-      if (viable) candidates.push({ tonicMidi, degreesInRange });
+      if (viable) candidates.push({
+        tonicMidi,
+        degreesInRange: config.sequenceLength === 2 ? twoNoteDegrees : degreesInRange
+      });
     }
     return candidates;
   }
@@ -1450,18 +1481,24 @@
     const widestCandidates = tonicCandidates.filter(candidate => candidate.degreesInRange.length === maximumChoiceCount);
     const selectedTonic = widestCandidates[randomIndex(widestCandidates.length)];
     const degrees = [];
+    let selectedPitchPair = null;
     if (session.sequenceLength === 2) {
-      const allowedDistances = new Set(session.allowedTwoNoteDistances);
-      const firstChoices = selectedTonic.degreesInRange.filter(first => selectedTonic.degreesInRange.some(second => (
-        first !== second
-        && allowedDistances.has(Math.abs(session.mode.intervals[first] - session.mode.intervals[second]))
-      )));
+      const pitchPairs = buildTwoNotePitchPairs(
+        selectedTonic.tonicMidi,
+        selectedTonic.degreesInRange,
+        session.mode,
+        session.allowedTwoNoteDistances,
+        session.rangeMin,
+        session.rangeMax
+      );
+      const firstChoices = [...new Set(pitchPairs.map(pair => pair.first.degree))];
       const first = drawDegree(firstChoices);
-      const secondChoices = selectedTonic.degreesInRange.filter(second => (
-        second !== first
-        && allowedDistances.has(Math.abs(session.mode.intervals[first] - session.mode.intervals[second]))
-      ));
-      degrees.push(first, drawDegree(secondChoices));
+      const pairsFromFirst = pitchPairs.filter(pair => pair.first.degree === first);
+      const secondChoices = [...new Set(pairsFromFirst.map(pair => pair.second.degree))];
+      const second = drawDegree(secondChoices);
+      const matchingPairs = pairsFromFirst.filter(pair => pair.second.degree === second);
+      selectedPitchPair = matchingPairs[randomIndex(matchingPairs.length)];
+      degrees.push(first, second);
     } else {
       const remainingDegrees = [...selectedTonic.degreesInRange];
       for (let index = 0; index < session.sequenceLength; index += 1) {
@@ -1471,14 +1508,18 @@
       }
     }
     const intervals = degrees.map(degree => session.mode.intervals[degree]);
-    const targetMidis = intervals.map(interval => selectedTonic.tonicMidi + interval);
+    const targetMidis = selectedPitchPair
+      ? [selectedPitchPair.first.midi, selectedPitchPair.second.midi]
+      : intervals.map(interval => selectedTonic.tonicMidi + interval);
     return {
       keyIndex,
       key,
       degrees,
       intervals,
       targetMidis,
-      answerTonicMidi: selectedTonic.tonicMidi,
+      answerTonicMidi: selectedPitchPair
+        ? selectedPitchPair.first.midi - intervals[0]
+        : selectedTonic.tonicMidi,
       playCount: 0,
       responseStartedAt: null,
       responseSeconds: null
@@ -2349,10 +2390,15 @@
     return noteName(Number(button.dataset.interval), button.dataset.high === 'true');
   }
 
-  function answerButtonMidi(buttonIndex) {
+  function answerButtonMidi(buttonIndex, position = 0) {
     const button = keyButtons[buttonIndex];
     const interval = Number(button.dataset.interval);
-    return midiInRoundWindow(interval) + (button.dataset.high === 'true' ? 12 : 0);
+    const high = button.dataset.high === 'true';
+    let midi = midiInRoundWindow(interval) + (high ? 12 : 0);
+    if (session.sequenceLength > 1 && !high && currentRound.targetMidis[position] !== undefined) {
+      midi += Math.round((currentRound.targetMidis[position] - midi) / 12) * 12;
+    }
+    return midi;
   }
 
   function previewAnswerKey(buttonIndex) {
