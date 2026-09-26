@@ -2408,12 +2408,15 @@
     return noteName(Number(button.dataset.interval), button.dataset.high === 'true');
   }
 
-  function answerButtonMidi(buttonIndex, position = 0) {
+  function answerButtonMidi(buttonIndex, position = null) {
     const button = keyButtons[buttonIndex];
     const interval = Number(button.dataset.interval);
     const high = button.dataset.high === 'true';
     let midi = midiInRoundWindow(interval) + (high ? 12 : 0);
-    if (session.sequenceLength > 1 && !high && currentRound.targetMidis[position] !== undefined) {
+    if (session.sequenceLength > 1
+      && Number.isInteger(position)
+      && !high
+      && currentRound.targetMidis[position] !== undefined) {
       midi += Math.round((currentRound.targetMidis[position] - midi) / 12) * 12;
     }
     return midi;
