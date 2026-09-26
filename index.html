@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#11100f" />
   <title>TONIC — 相対音感トレーニング</title>
-  <link rel="stylesheet" href="styles.css?v=20260926-1">
+  <link rel="stylesheet" href="styles.css?v=20260926-2">
 </head>
 <body>
   <div class="shell">
@@ -125,6 +125,7 @@
                   <div class="advanced-mode-options">
                     <label class="advanced-select-row"><span>同じ調を連続</span><select name="keyRepeatCount" id="keyRepeatCount"></select></label>
                     <label class="advanced-select-row" id="fixedKeyChoiceRow" hidden><span>使用する調</span><select name="fixedKeyChoice" id="fixedKeyChoice"></select></label>
+                    <label class="advanced-toggle"><input type="checkbox" name="answerSecondOnly" id="answerSecondOnly" value="1" disabled><span>2音目のみ回答</span></label>
                     <label class="advanced-toggle"><input type="checkbox" name="preQuestionReference" value="1"><span>ド基準フレーズ前半を出題前に再生</span></label>
                   </div>
                 </fieldset>
@@ -401,11 +402,11 @@
         </div>
       </section>
     </main>
-    <footer class="site-version">Version 2.2</footer>
+    <footer class="site-version">Version 2.3</footer>
     <p class="sr-only" id="liveRegion" aria-live="assertive"></p>
   </div>
 
   <script src="https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/acoustic_grand_piano-mp3.js"></script>
-  <script src="app.js?v=20260926-3"></script>
+  <script src="app.js?v=20260926-4"></script>
 </body>
 </html>

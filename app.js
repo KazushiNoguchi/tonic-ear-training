@@ -278,6 +278,7 @@
   const questionSpeedControl = document.querySelector('#questionSpeedControl');
   const questionNoteSpeedInput = document.querySelector('#questionNoteSpeed');
   const questionNoteSpeedValue = document.querySelector('#questionNoteSpeedValue');
+  const answerSecondOnlyInput = document.querySelector('#answerSecondOnly');
   const excludeNoteInputs = [...settingsForm.querySelectorAll('input[name="excludeNote"]')];
   const rangeMinInput = document.querySelector('#rangeMin');
   const rangeMaxInput = document.querySelector('#rangeMax');
@@ -414,6 +415,7 @@
     modeId: 'diatonic',
     mode: MODES.diatonic,
     sequenceLength: 1,
+    answerSecondOnly: false,
     questionNoteSeconds: 0.5,
     timbre: 'piano',
     excludedIntervals: [],
@@ -2193,7 +2195,7 @@
     nextButton.textContent = '再生中…';
     replayButton.disabled = true;
     clearAnswerButton.disabled = true;
-    clearAnswerButton.hidden = session.sequenceLength === 1;
+    clearAnswerButton.hidden = requiredAnswerCount() === 1;
     referencePatternButton.hidden = true;
     referenceSpeedControl.hidden = true;
     referenceSpeedInput.disabled = false;
@@ -2215,12 +2217,13 @@
     const targetStart = scheduleChordProgression(tonic, session.progression, chordStart) + 0.5;
     const questionNoteSeconds = session.sequenceLength > 1 ? session.questionNoteSeconds : 0.5;
     const questionNoteDuration = Math.max(0.18, questionNoteSeconds - 0.02);
+    const inputStart = targetStart + (session.sequenceLength - 1) * questionNoteSeconds;
     currentRound.targetMidis.forEach((midi, index) => {
       scheduleTone(midi, targetStart + index * questionNoteSeconds, questionNoteDuration, 0.24);
     });
     if (!reviewMode && currentRound.responseStartedAt === null) {
       currentRound.responseStartedAt = performance.now()
-        + Math.max(0, targetStart - audioContext.currentTime) * 1000;
+        + Math.max(0, inputStart - audioContext.currentTime) * 1000;
     }
 
     const idAtStart = playbackId;
@@ -2258,18 +2261,22 @@
         liveRegion.textContent = '再生が終わりました。';
       });
     } else {
-      const inputStart = targetStart + (session.sequenceLength - 1) * questionNoteSeconds;
       scheduleUi(inputStart - audioContext.currentTime, () => {
         if (idAtStart !== playbackId) return;
         state = 'answering';
         game.classList.remove('is-playing');
         phaseText.textContent = '回答';
-        headline.textContent = session.sequenceLength === 1 ? '音を選んでください' : `0 / ${session.sequenceLength}`;
+        const answerCount = requiredAnswerCount();
+        headline.textContent = session.answerSecondOnly
+          ? '2音目を選んでください'
+          : answerCount === 1 ? '音を選んでください' : `0 / ${answerCount}`;
         setSequence(2, 1);
         setKeysEnabled(true);
         replayButton.disabled = false;
         clearAnswerButton.disabled = true;
-        liveRegion.textContent = `${session.sequenceLength}音を順番に回答してください。`;
+        liveRegion.textContent = session.answerSecondOnly
+          ? '2音目を回答してください。'
+          : `${answerCount}音を順番に回答してください。`;
       });
     }
   }
@@ -2408,16 +2415,35 @@
     return noteName(Number(button.dataset.interval), button.dataset.high === 'true');
   }
 
+  function answerTargetPositions() {
+    return session.answerSecondOnly && session.sequenceLength === 2
+      ? [1]
+      : Array.from({ length: session.sequenceLength }, (_, index) => index);
+  }
+
+  function requiredAnswerCount() {
+    return answerTargetPositions().length;
+  }
+
+  function answerTargetDegrees() {
+    return answerTargetPositions().map(position => currentRound.degrees[position]);
+  }
+
+  function answerTargetMidis() {
+    return answerTargetPositions().map(position => currentRound.targetMidis[position]);
+  }
+
   function answerButtonMidi(buttonIndex, position = null) {
     const button = keyButtons[buttonIndex];
     const interval = Number(button.dataset.interval);
     const high = button.dataset.high === 'true';
     let midi = midiInRoundWindow(interval) + (high ? 12 : 0);
+    const targetPosition = Number.isInteger(position) ? answerTargetPositions()[position] : null;
     if (session.sequenceLength > 1
-      && Number.isInteger(position)
+      && Number.isInteger(targetPosition)
       && !high
-      && currentRound.targetMidis[position] !== undefined) {
-      midi += Math.round((currentRound.targetMidis[position] - midi) / 12) * 12;
+      && currentRound.targetMidis[targetPosition] !== undefined) {
+      midi += Math.round((currentRound.targetMidis[targetPosition] - midi) / 12) * 12;
     }
     return midi;
   }
@@ -2429,7 +2455,7 @@
   }
 
   function markCorrectAnswerKeys() {
-    const correctDegrees = new Set(currentRound.degrees);
+    const correctDegrees = new Set(answerTargetDegrees());
     keyButtons.forEach(button => {
       if (correctDegrees.has(Number(button.dataset.answerIndex))) button.classList.add('correct');
     });
@@ -2437,7 +2463,7 @@
 
   function refreshFeedbackNotation() {
     const answerNames = userAnswers.map(answerButtonName);
-    const correctNames = currentRound.degrees.map(index => modeNoteName(session.mode, index));
+    const correctNames = answerTargetDegrees().map(index => modeNoteName(session.mode, index));
     const responseTimeText = `${(currentRound.responseSeconds || 0).toFixed(2)}秒`;
     feedbackDetail.textContent = lastRoundCorrect
       ? `${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`
@@ -2456,12 +2482,15 @@
       : Math.max(0, (performance.now() - currentRound.responseStartedAt) / 1000);
     const responseTimeText = `${currentRound.responseSeconds.toFixed(2)}秒`;
 
-    const positionResults = userAnswers.map((buttonIndex, index) => answerDegreeIndex(buttonIndex) === currentRound.degrees[index]);
+    const targetDegrees = answerTargetDegrees();
+    const targetPositions = answerTargetPositions();
+    const targetMidis = answerTargetMidis();
+    const positionResults = userAnswers.map((buttonIndex, index) => answerDegreeIndex(buttonIndex) === targetDegrees[index]);
     const correct = positionResults.every(Boolean);
     lastRoundCorrect = correct;
-    currentRound.intervals.forEach((interval, index) => {
+    targetPositions.forEach((position, index) => {
       recordAnswer(
-        interval,
+        currentRound.intervals[position],
         session.mode.intervals[answerDegreeIndex(userAnswers[index])],
         positionResults[index],
         currentRound.keyIndex,
@@ -2471,9 +2500,9 @@
     recordQuestion(correct, currentRound.playCount, currentRound.responseSeconds);
 
     const answerNames = userAnswers.map(answerButtonName);
-    const correctNames = currentRound.degrees.map(index => modeNoteName(session.mode, index));
+    const correctNames = targetDegrees.map(index => modeNoteName(session.mode, index));
     const selectedMidis = userAnswers.map(answerButtonMidi);
-    const correctDegreeSet = new Set(currentRound.degrees);
+    const correctDegreeSet = new Set(targetDegrees);
 
     userAnswers.forEach((buttonIndex, index) => {
       if (!positionResults[index] && !correctDegreeSet.has(answerDegreeIndex(buttonIndex))) keyButtons[buttonIndex].classList.add('wrong');
@@ -2506,7 +2535,7 @@
       } else {
         scheduleSequence(selectedMidis, now);
         scheduleSequence(
-          currentRound.targetMidis,
+          targetMidis,
           now + selectedMidis.length * session.questionNoteSeconds + 0.35
         );
       }
@@ -2544,8 +2573,9 @@
     if (state !== 'answering') return;
     animateKey(index);
     userAnswers.push(index);
-    if (userAnswers.length < session.sequenceLength) {
-      headline.textContent = `${userAnswers.length} / ${session.sequenceLength}`;
+    const answerCount = requiredAnswerCount();
+    if (userAnswers.length < answerCount) {
+      headline.textContent = `${userAnswers.length} / ${answerCount}`;
       statusCopy.textContent = userAnswers.map(answerButtonName).join(' → ');
       clearAnswerButton.disabled = false;
       liveRegion.textContent = `${userAnswers.length}音目を入力しました。`;
@@ -2602,7 +2632,8 @@
     const percentage = Math.round((score / session.total) * 100);
     resultScore.textContent = percentage;
     const exclusionSetting = session.excludedIntervals.length ? ` · ${session.excludedIntervals.length}音除外` : '';
-    resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音 · ${session.progression.label} · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
+    const answerSetting = session.answerSecondOnly ? ' · 2音目のみ回答' : '';
+    resultCaption.textContent = `${session.mode.label}${exclusionSetting} · ${session.sequenceLength}音${answerSetting} · ${session.progression.label} · ${TIMBRES[session.timbre]} · ${session.total}問中 ${score}問正解`;
     renderAnalytics(sessionStats, sessionStatsContent);
     setupNumber.textContent = 'RESULT';
     setupTitle.textContent = '結果';
@@ -2678,6 +2709,7 @@
     const sequenceLength = Number(sequenceLengthInputs.find(input => input.checked)?.value || 1);
     twoNoteIntervalOptions.hidden = sequenceLength !== 2;
     questionSpeedControl.hidden = sequenceLength === 1;
+    answerSecondOnlyInput.disabled = sequenceLength !== 2;
   }
 
   noteModeInputs.forEach(input => input.addEventListener('change', updateExcludeOptions));
@@ -2733,6 +2765,7 @@
       modeId,
       mode: MODES[modeId],
       sequenceLength,
+      answerSecondOnly: sequenceLength === 2 && data.has('answerSecondOnly'),
       questionNoteSeconds: Number(data.get('questionNoteSpeed')),
       timbre: data.get('timbre'),
       excludedIntervals,
