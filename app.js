@@ -275,6 +275,9 @@
   const noteModeInputs = [...settingsForm.querySelectorAll('input[name="noteMode"]')];
   const sequenceLengthInputs = [...settingsForm.querySelectorAll('input[name="sequenceLength"]')];
   const twoNoteIntervalOptions = document.querySelector('#twoNoteIntervalOptions');
+  const questionSpeedControl = document.querySelector('#questionSpeedControl');
+  const questionNoteSpeedInput = document.querySelector('#questionNoteSpeed');
+  const questionNoteSpeedValue = document.querySelector('#questionNoteSpeedValue');
   const excludeNoteInputs = [...settingsForm.querySelectorAll('input[name="excludeNote"]')];
   const rangeMinInput = document.querySelector('#rangeMin');
   const rangeMaxInput = document.querySelector('#rangeMax');
@@ -411,6 +414,7 @@
     modeId: 'diatonic',
     mode: MODES.diatonic,
     sequenceLength: 1,
+    questionNoteSeconds: 0.5,
     timbre: 'piano',
     excludedIntervals: [],
     rangeMin: 36,
@@ -488,6 +492,15 @@
   volumeValue.textContent = volumeSlider.value;
 
   const REFERENCE_SPEED_STORAGE_KEY = 'tonic-ear-training-reference-speed';
+  const QUESTION_SPEED_STORAGE_KEY = 'tonic-ear-training-question-speed';
+  try {
+    const savedQuestionSpeed = Number(localStorage.getItem(QUESTION_SPEED_STORAGE_KEY));
+    if (Number.isFinite(savedQuestionSpeed) && savedQuestionSpeed >= 0.25 && savedQuestionSpeed <= 1) {
+      questionNoteSpeedInput.value = String(savedQuestionSpeed);
+    }
+  } catch (_) {}
+  questionNoteSpeedValue.textContent = `${Number(questionNoteSpeedInput.value).toFixed(2)}秒`;
+
   let referenceNoteSeconds = 0.5;
   try {
     const savedReferenceSpeed = Number(localStorage.getItem(REFERENCE_SPEED_STORAGE_KEY));
@@ -2200,8 +2213,10 @@
       chordStart = scheduleReferenceSequence(buildReferenceFirstHalf(lowTonic), now) + referenceNoteSeconds * 0.7;
     }
     const targetStart = scheduleChordProgression(tonic, session.progression, chordStart) + 0.5;
+    const questionNoteSeconds = session.sequenceLength > 1 ? session.questionNoteSeconds : 0.5;
+    const questionNoteDuration = Math.max(0.18, questionNoteSeconds - 0.02);
     currentRound.targetMidis.forEach((midi, index) => {
-      scheduleTone(midi, targetStart + index * 0.5, 0.48, 0.24);
+      scheduleTone(midi, targetStart + index * questionNoteSeconds, questionNoteDuration, 0.24);
     });
     if (!reviewMode && currentRound.responseStartedAt === null) {
       currentRound.responseStartedAt = performance.now()
@@ -2224,7 +2239,8 @@
       setSequence(1, 0);
     });
     if (reviewMode) {
-      const playbackEndDelay = targetStart - audioContext.currentTime + session.sequenceLength * 0.5 + 0.25;
+      const playbackEndDelay = targetStart - audioContext.currentTime
+        + session.sequenceLength * questionNoteSeconds + 0.25;
       scheduleUi(playbackEndDelay, () => {
         if (idAtStart !== playbackId) return;
         state = 'feedback';
@@ -2242,7 +2258,7 @@
         liveRegion.textContent = '再生が終わりました。';
       });
     } else {
-      const inputStart = targetStart + (session.sequenceLength - 1) * 0.5;
+      const inputStart = targetStart + (session.sequenceLength - 1) * questionNoteSeconds;
       scheduleUi(inputStart - audioContext.currentTime, () => {
         if (idAtStart !== playbackId) return;
         state = 'answering';
@@ -2273,7 +2289,9 @@
   }
 
   function scheduleSequence(midis, start) {
-    midis.forEach((midi, index) => scheduleTone(midi, start + index * 0.5, 0.46, 0.25));
+    const noteSeconds = session.sequenceLength > 1 ? session.questionNoteSeconds : 0.5;
+    const noteDuration = Math.max(0.18, noteSeconds - 0.04);
+    midis.forEach((midi, index) => scheduleTone(midi, start + index * noteSeconds, noteDuration, 0.25));
   }
 
   function midiInRoundWindow(interval) {
@@ -2484,7 +2502,10 @@
         scheduleTonicResolution(currentRound.intervals[0], currentRound.targetMidis[0], now + 1.3);
       } else {
         scheduleSequence(selectedMidis, now);
-        scheduleSequence(currentRound.targetMidis, now + selectedMidis.length * 0.5 + 0.35);
+        scheduleSequence(
+          currentRound.targetMidis,
+          now + selectedMidis.length * session.questionNoteSeconds + 0.35
+        );
       }
       feedbackMain.textContent = '不正解';
       feedbackDetail.textContent = `回答：${answerNames.join(' → ')} ／ 正解：${correctNames.join(' → ')} ／ ${currentRound.key.name} ／ ${responseTimeText}`;
@@ -2650,20 +2671,27 @@
     fixedKeyChoiceRow.hidden = keyRepeatCountInput.value !== 'all';
   }
 
-  function updateTwoNoteIntervalOptions() {
+  function updateSequenceOptions() {
     const sequenceLength = Number(sequenceLengthInputs.find(input => input.checked)?.value || 1);
     twoNoteIntervalOptions.hidden = sequenceLength !== 2;
+    questionSpeedControl.hidden = sequenceLength === 1;
   }
 
   noteModeInputs.forEach(input => input.addEventListener('change', updateExcludeOptions));
-  sequenceLengthInputs.forEach(input => input.addEventListener('change', updateTwoNoteIntervalOptions));
+  sequenceLengthInputs.forEach(input => input.addEventListener('change', updateSequenceOptions));
+  questionNoteSpeedInput.addEventListener('input', () => {
+    questionNoteSpeedValue.textContent = `${Number(questionNoteSpeedInput.value).toFixed(2)}秒`;
+    try {
+      localStorage.setItem(QUESTION_SPEED_STORAGE_KEY, questionNoteSpeedInput.value);
+    } catch (_) {}
+  });
   rangeMinInput.addEventListener('input', () => updateRange('minimum'));
   rangeMaxInput.addEventListener('input', () => updateRange('maximum'));
   keyRepeatCountInput.addEventListener('change', updateFixedKeyChoice);
   updateExcludeOptions();
   updateRange('minimum');
   updateFixedKeyChoice();
-  updateTwoNoteIntervalOptions();
+  updateSequenceOptions();
   updateNotationUI();
 
   settingsForm.addEventListener('submit', async event => {
@@ -2702,6 +2730,7 @@
       modeId,
       mode: MODES[modeId],
       sequenceLength,
+      questionNoteSeconds: Number(data.get('questionNoteSpeed')),
       timbre: data.get('timbre'),
       excludedIntervals,
       rangeMin: Number(data.get('rangeMin')),
