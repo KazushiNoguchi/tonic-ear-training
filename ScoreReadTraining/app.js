@@ -7,18 +7,18 @@
     treble: {
       label: 'ト音記号',
       symbol: '𝄞',
-      symbolY: 212,
+      symbolY: 272,
       bottomLineNumber: 30,
-      minimumNumber: 28,
-      maximumNumber: 41
+      minimumNumber: 24,
+      maximumNumber: 45
     },
     bass: {
       label: 'ヘ音記号',
       symbol: '𝄢',
-      symbolY: 197,
+      symbolY: 257,
       bottomLineNumber: 18,
-      minimumNumber: 14,
-      maximumNumber: 27
+      minimumNumber: 10,
+      maximumNumber: 31
     }
   };
 
@@ -67,16 +67,16 @@
   }
 
   function noteY(clef, diatonicNumber) {
-    return 220 - (diatonicNumber - clef.bottomLineNumber) * 15;
+    return 280 - (diatonicNumber - clef.bottomLineNumber) * 15;
   }
 
   function setLedgerLines(y) {
     ledgerLines.replaceChildren();
     const positions = [];
-    if (y > 220) {
-      for (let ledgerY = 250; ledgerY <= y + 15; ledgerY += 30) positions.push(ledgerY);
-    } else if (y < 100) {
-      for (let ledgerY = 70; ledgerY >= y - 15; ledgerY -= 30) positions.push(ledgerY);
+    if (y > 280) {
+      for (let ledgerY = 310; ledgerY <= y + 15; ledgerY += 30) positions.push(ledgerY);
+    } else if (y < 160) {
+      for (let ledgerY = 130; ledgerY >= y; ledgerY -= 30) positions.push(ledgerY);
     }
     positions.forEach(ledgerY => {
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
